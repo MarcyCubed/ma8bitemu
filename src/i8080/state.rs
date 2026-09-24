@@ -1,5 +1,6 @@
 //! The internal state of an 8080 processor
 
+use crate::i8080::I8080FamilyState;
 use core::num::Wrapping;
 
 /// The internal state of an 8080 processor
@@ -122,39 +123,166 @@ impl State {
         self.h = Wrapping(bytes[1]);
     }
 
-    /// Get the value of some register as specified in instructions like MOV and ADD
+    /// Write the state to the screen.
     ///
-    /// Return the value if the source is a register or `None` if it's a memory operation
-    pub(crate) fn source_from_opcode(&self, opcode: u8) -> Option<u8> {
-        match opcode & 0b111 {
-            0b000 => Some(self.b.0),
-            0b001 => Some(self.c.0),
-            0b010 => Some(self.d.0),
-            0b011 => Some(self.e.0),
-            0b100 => Some(self.h.0),
-            0b101 => Some(self.l.0),
-            0b111 => Some(self.a.0),
-            _ => None,
-        }
+    /// Also shows the opcode if it's known.
+    #[cfg(feature = "std")]
+    pub fn dump(&self, opcode: u8) {
+        print!("pc={:04x}h", self.pc);
+        print!(",sp={:04x}h", self.sp);
+        print!(",op={:02x}h", opcode);
+        print!(",a={:02x}h", self.a);
+        print!(",bc={:04x}h", self.bc());
+        print!(",de={:04x}h", self.de());
+        print!(",hl={:04x}h", self.hl());
+        print!(",cf={}", self.cf as u8);
+        print!(",pf={}", self.pf as u8);
+        print!(",af={}", self.af as u8);
+        print!(",zf={}", self.zf as u8);
+        print!(",sf={}", self.sf as u8);
+        print!(",iff={}", self.inte as u8);
+
+        println!();
+    }
+}
+
+impl I8080FamilyState for State {
+    #[inline]
+    fn get_a(&self) -> Wrapping<u8> {
+        self.a
     }
 
-    /// Get the value of a condition for conditional jumps, calls and returns
-    pub(crate) fn opcode_to_condition(&self, opcode: u8) -> bool {
-        match (opcode >> 3) & 0b111 {
-            0b000 => !self.zf,
-            0b001 => self.zf,
-            0b010 => !self.cf,
-            0b011 => self.cf,
-            0b100 => !self.pf,
-            0b101 => self.pf,
-            0b110 => !self.sf,
-            0b111 => self.sf,
-            _ => unreachable!("No opcode condition bigger than 7"),
-        }
+    #[inline]
+    fn get_b(&self) -> Wrapping<u8> {
+        self.b
+    }
+
+    #[inline]
+    fn get_c(&self) -> Wrapping<u8> {
+        self.c
+    }
+
+    #[inline]
+    fn get_d(&self) -> Wrapping<u8> {
+        self.d
+    }
+
+    #[inline]
+    fn get_e(&self) -> Wrapping<u8> {
+        self.e
+    }
+
+    #[inline]
+    fn get_h(&self) -> Wrapping<u8> {
+        self.h
+    }
+
+    #[inline]
+    fn get_l(&self) -> Wrapping<u8> {
+        self.l
+    }
+
+    #[inline]
+    fn get_a_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.a
+    }
+
+    #[inline]
+    fn get_b_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.b
+    }
+
+    #[inline]
+    fn get_c_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.c
+    }
+
+    #[inline]
+    fn get_d_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.d
+    }
+
+    #[inline]
+    fn get_e_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.e
+    }
+
+    #[inline]
+    fn get_h_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.h
+    }
+
+    #[inline]
+    fn get_l_mut(&mut self) -> &mut Wrapping<u8> {
+        &mut self.l
+    }
+
+    #[inline]
+    fn get_bc(&self) -> u16 {
+        self.bc()
+    }
+
+    #[inline]
+    fn set_bc(&mut self, value: u16) {
+        State::set_bc(self, value)
+    }
+
+    #[inline]
+    fn get_de(&self) -> u16 {
+        self.de()
+    }
+
+    #[inline]
+    fn set_de(&mut self, value: u16) {
+        State::set_de(self, value)
+    }
+
+    #[inline]
+    fn get_hl(&self) -> u16 {
+        self.hl()
+    }
+
+    #[inline]
+    fn set_hl(&mut self, value: u16) {
+        State::set_hl(self, value)
+    }
+
+    #[inline]
+    fn get_pc(&self) -> Wrapping<u16> {
+        self.pc
+    }
+
+    fn get_pc_mut(&mut self) -> &mut Wrapping<u16> {
+        &mut self.pc
+    }
+
+    #[inline]
+    fn set_pc(&mut self, value: u16) {
+        self.pc.0 = value
+    }
+
+    #[inline]
+    fn get_sp(&self) -> Wrapping<u16> {
+        self.sp
+    }
+
+    #[inline]
+    fn set_sp(&mut self, value: u16) {
+        self.sp.0 = value
+    }
+
+    #[inline]
+    fn flags_from_value(&mut self, value: u8) {
+        State::flags_from_value(self, value)
+    }
+
+    #[inline]
+    fn overflow_flag(&mut self, _overflow: bool) {
+        // No overflow in 8080
     }
 
     /// Turn the flags into the F register
-    pub fn serialize_flags(&self) -> u8 {
+    fn serialize_flags(&self) -> u8 {
         let mut val = 1 << 1; // Bit 1 is set
         if self.cf {
             val |= 1 << Self::C_FLAG_BIT
@@ -176,7 +304,7 @@ impl State {
     }
 
     /// Load the flags from the bit flags
-    pub fn deserialize_flags(&mut self, flags: u8) {
+    fn deserialize_flags(&mut self, flags: u8) {
         self.cf = flags & (1 << Self::C_FLAG_BIT) != 0;
         self.af = flags & (1 << Self::A_FLAG_BIT) != 0;
         self.sf = flags & (1 << Self::S_FLAG_BIT) != 0;
@@ -184,26 +312,58 @@ impl State {
         self.pf = flags & (1 << Self::P_FLAG_BIT) != 0;
     }
 
-    /// Write the state to the screen.
-    ///
-    /// Also shows the opcode if it's known.
-    #[cfg(feature = "std")]
-    pub fn dump(&self, opcode: u8) {
-        print!("pc={:04x}h", self.pc);
-        print!(",sp={:04x}h", self.sp);
-        print!(",op={:02x}h", opcode);
-        print!(",a={:02x}h", self.a);
-        print!(",bc={:04x}h", self.bc());
-        print!(",de={:04x}h", self.de());
-        print!(",hl={:04x}h", self.hl());
-        print!(",cf={}", self.cf as u8);
-        print!(",pf={}", self.pf as u8);
-        print!(",af={}", self.af as u8);
-        print!(",zf={}", self.zf as u8);
-        print!(",sf={}", self.sf as u8);
-        print!(",iff={}", self.inte as u8);
+    #[inline]
+    fn get_cf(&self) -> bool {
+        self.cf
+    }
 
-        println!();
+    #[inline]
+    fn set_cf(&mut self, flag: bool) {
+        self.cf = flag
+    }
+
+    #[inline]
+    fn get_pf(&self) -> bool {
+        self.pf
+    }
+
+    #[inline]
+    fn set_pf(&mut self, flag: bool) {
+        self.pf = flag
+    }
+
+    #[inline]
+    fn get_zf(&self) -> bool {
+        self.zf
+    }
+
+    #[inline]
+    fn set_zf(&mut self, flag: bool) {
+        self.zf = flag
+    }
+
+    #[inline]
+    fn get_sf(&self) -> bool {
+        self.sf
+    }
+
+    #[inline]
+    fn set_sf(&mut self, flag: bool) {
+        self.sf = flag
+    }
+
+    #[inline]
+    fn get_af(&self) -> bool {
+        self.af
+    }
+
+    #[inline]
+    fn set_af(&mut self, flag: bool) {
+        self.af = flag
+    }
+
+    fn set_nf(&mut self, _flag: bool) {
+        // Do nothing
     }
 }
 

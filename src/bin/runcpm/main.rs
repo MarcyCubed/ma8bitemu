@@ -1,5 +1,9 @@
-use ma8080emu::emulator::{Emulator, EmulatorState};
+//use ma8080emu::emulator::{Emulator, EmulatorState};
+//use
+use ma8bitemu::i8080::Emulator;
+use ma8bitemu::{EmulatorCore, ExecEffect, Fetch};
 use std::fs;
+
 const MIN_PRINT: usize = usize::MAX;
 const MAX_PRINT: usize = usize::MAX;
 
@@ -76,12 +80,12 @@ impl CpmRunner {
             let (cycles, result) = self.emulator.run_opcode(opcode, &mut self.memory);
             self.cycles += cycles as u64;
             match result {
-                EmulatorState::Halted => {
+                ExecEffect::Halt => {
                     println!();
                     println!("Crashed");
                     break;
                 }
-                EmulatorState::Out { port, .. } => {
+                ExecEffect::Out { port, .. } => {
                     if port == 0 {
                         println!();
                         println!("Finished execution");

@@ -1,5 +1,7 @@
 [package]
-name = "ma8080emu"
+name = "ma8bitemu"
+description = "A no-std library for 8-bit processors emulators"
+readme = "README.md"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,3 +13,7 @@ std = []
 [[bin]]
 name = "runcpm"
 required-features = ["std"]
+
+[profile.release-line]
+inherits = "release"
+debug = "line-tables-only"

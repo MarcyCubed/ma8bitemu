@@ -1,4 +1,4 @@
-# Marcy's Amazing 8080 Emulator!
+# Marcy's Amazing 8-Bit Emulators!
 
-This is the amazing Marcy's amazing 8080 emulator of amazingness!!
+This is the amazing Marcy's amazing collection of emulators of amazingness!!
 

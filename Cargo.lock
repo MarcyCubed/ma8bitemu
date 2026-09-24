@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "ma8080emu"
+name = "ma8bitemu"
 version = "0.1.0"

@@ -1,7 +1,7 @@
 //! Instructions that control the program flow and relatives.
 
+use crate::i8080::state::State;
 use crate::memory::Memory;
-use crate::state::State;
 
 /// Perform a return if the condition is true.
 ///
