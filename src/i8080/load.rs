@@ -1,5 +1,5 @@
 use crate::Fetch;
-use crate::i8080::I8080FamilyState;
+use crate::i8080::{I8080FamilyState, jump};
 use crate::memory::Memory;
 use core::num::Wrapping;
 
@@ -116,6 +116,36 @@ pub(crate) fn mov_mem_r<S: I8080FamilyState>(
 ) -> u8 {
     memory.store(state.get_hl(), register(state).0);
     7
+}
+
+/// Exchanges HL with the top of the stack
+pub(crate) fn xthl(
+    state: &mut impl I8080FamilyState,
+    memory: &mut impl Memory,
+    clock_cycles: u8,
+) -> u8 {
+    let popped = jump::pop_stack(state, memory);
+    let hl = state.get_hl();
+    jump::push_stack(state, memory, hl);
+    state.set_hl(popped);
+    clock_cycles
+}
+
+/// Move HL to SP
+pub(crate) fn sphl(state: &mut impl I8080FamilyState, cycles: u8) -> u8 {
+    state.get_sp_mut().0 = state.get_hl();
+    cycles
+}
+
+/// Exchanges DE and HL
+pub(crate) fn xchg(state: &mut impl I8080FamilyState) -> u8 {
+    let d = state.get_d();
+    *state.get_d_mut() = state.get_h();
+    *state.get_h_mut() = d;
+    let e = state.get_e();
+    *state.get_e_mut() = state.get_l();
+    *state.get_l_mut() = e;
+    4
 }
 
 /*

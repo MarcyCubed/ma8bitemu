@@ -74,42 +74,6 @@ impl State {
         }
     }
 
-    /// Get the value of the BC register pair
-    pub fn bc(&self) -> u16 {
-        u16::from_le_bytes([self.c.0, self.b.0])
-    }
-
-    /// Set the value of the BC register pair
-    pub fn set_bc(&mut self, value: u16) {
-        let bytes = value.to_le_bytes();
-        self.c = Wrapping(bytes[0]);
-        self.b = Wrapping(bytes[1]);
-    }
-
-    /// Get the value of the DE register pair
-    pub fn de(&self) -> u16 {
-        u16::from_le_bytes([self.e.0, self.d.0])
-    }
-
-    /// Set the value of the DE register pair
-    pub fn set_de(&mut self, value: u16) {
-        let bytes = value.to_le_bytes();
-        self.e = Wrapping(bytes[0]);
-        self.d = Wrapping(bytes[1]);
-    }
-
-    /// Get the value of the HL register pair
-    pub fn hl(&self) -> u16 {
-        u16::from_le_bytes([self.l.0, self.h.0])
-    }
-
-    /// Set the value of the HL register pair
-    pub fn set_hl(&mut self, value: u16) {
-        let bytes = value.to_le_bytes();
-        self.l = Wrapping(bytes[0]);
-        self.h = Wrapping(bytes[1]);
-    }
-
     /// Write the state to the screen.
     ///
     /// Also shows the opcode if it's known.
@@ -119,9 +83,9 @@ impl State {
         print!(",sp={:04x}h", self.sp);
         print!(",op={:02x}h", opcode);
         print!(",a={:02x}h", self.a);
-        print!(",bc={:04x}h", self.bc());
-        print!(",de={:04x}h", self.de());
-        print!(",hl={:04x}h", self.hl());
+        print!(",bc={:04x}h", self.get_bc());
+        print!(",de={:04x}h", self.get_de());
+        print!(",hl={:04x}h", self.get_hl());
         print!(",cf={}", self.cf as u8);
         print!(",pf={}", self.pf as u8);
         print!(",af={}", self.af as u8);
@@ -205,47 +169,13 @@ impl I8080FamilyState for State {
     }
 
     #[inline]
-    fn get_bc(&self) -> u16 {
-        self.bc()
-    }
-
-    #[inline]
-    fn set_bc(&mut self, value: u16) {
-        State::set_bc(self, value)
-    }
-
-    #[inline]
-    fn get_de(&self) -> u16 {
-        self.de()
-    }
-
-    #[inline]
-    fn set_de(&mut self, value: u16) {
-        State::set_de(self, value)
-    }
-
-    #[inline]
-    fn get_hl(&self) -> u16 {
-        self.hl()
-    }
-
-    #[inline]
-    fn set_hl(&mut self, value: u16) {
-        State::set_hl(self, value)
-    }
-
-    #[inline]
     fn get_pc(&self) -> Wrapping<u16> {
         self.pc
     }
 
+    #[inline]
     fn get_pc_mut(&mut self) -> &mut Wrapping<u16> {
         &mut self.pc
-    }
-
-    #[inline]
-    fn set_pc(&mut self, value: u16) {
-        self.pc.0 = value
     }
 
     #[inline]
@@ -254,8 +184,8 @@ impl I8080FamilyState for State {
     }
 
     #[inline]
-    fn set_sp(&mut self, value: u16) {
-        self.sp.0 = value
+    fn get_sp_mut(&mut self) -> &mut Wrapping<u16> {
+        &mut self.sp
     }
 
     #[inline]
@@ -347,12 +277,12 @@ impl I8080FamilyState for State {
     }
 
     #[inline]
-    fn get_af(&self) -> bool {
+    fn get_hf(&self) -> bool {
         self.af
     }
 
     #[inline]
-    fn set_af(&mut self, flag: bool) {
+    fn set_hf(&mut self, flag: bool) {
         self.af = flag
     }
 

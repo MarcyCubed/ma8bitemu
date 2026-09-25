@@ -1,6 +1,6 @@
 //use ma8080emu::emulator::{Emulator, EmulatorState};
 //use
-use ma8bitemu::i8080::Emulator;
+use ma8bitemu::i8080::{Emulator, I8080FamilyState};
 use ma8bitemu::{EmulatorCore, ExecEffect, Fetch};
 use std::fs;
 
@@ -57,7 +57,7 @@ impl CpmRunner {
             }
             9 => {
                 // Function 9: Write a $ terminated string to the screen
-                let mut addr = self.emulator.state.de() as usize;
+                let mut addr = self.emulator.state.get_de() as usize;
                 while self.memory[addr] != '$' as u8 {
                     print!("{}", self.memory[addr] as char);
                     addr += 1;

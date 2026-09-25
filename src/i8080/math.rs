@@ -1,5 +1,6 @@
 //! Math instructions
 
+use crate::Fetch;
 use crate::i8080::I8080FamilyState;
 use crate::i8080::state::State;
 use crate::memory::Memory;
@@ -48,7 +49,7 @@ fn inc_value(state: &mut impl I8080FamilyState, value: Wrapping<u8>) -> Wrapping
     new_value += 1;
     state.flags_from_value(new_value.0);
     state.overflow_flag((1 << 7) & (value.0 ^ new_value.0) != 0);
-    state.set_af(0x10 & (value.0 ^ new_value.0) != 0);
+    state.set_hf(0x10 & (value.0 ^ new_value.0) != 0);
     state.set_nf(false);
     new_value
 }
@@ -84,7 +85,7 @@ fn dec_value(state: &mut State, value: Wrapping<u8>) -> Wrapping<u8> {
 
 /// Decrements the value in memory pointed by HL
 pub(crate) fn dec_mem(state: &mut State, memory: &mut impl Memory) -> u8 {
-    let address = state.hl();
+    let address = state.get_hl();
     let value = dec_value(state, Wrapping(memory.load(address)));
     memory.store(address, value.0);
     10
@@ -124,13 +125,14 @@ pub(crate) fn rar(state: &mut impl I8080FamilyState) -> u8 {
 /// Add a value to HL, updating the carry flag
 #[inline]
 pub(crate) fn dad(state: &mut State, register: fn(&State) -> u16) -> u8 {
-    let (hl, carry) = state.hl().overflowing_add(register(state));
+    let (hl, carry) = state.get_hl().overflowing_add(register(state));
     state.set_hl(hl);
     state.cf = carry;
     10
 }
 
 /// Check if the operation `a + b = c` had a carry on the specified bit.
+#[inline]
 pub(crate) fn check_carry(bit: u32, a: u16, b: u16, sum: u16) -> bool {
     (sum ^ a ^ b) & (1 << bit) != 0
 }
@@ -145,22 +147,10 @@ pub(crate) fn add_value(state: &mut impl I8080FamilyState, value: u8, carry: boo
     sum += carry as u16;
     state.set_nf(false);
     state.set_cf(sum.0 & (1 << 8) != 0);
-    state.set_af(check_carry(4, a, value, sum.0));
+    state.set_hf(check_carry(4, a, value, sum.0));
     state.overflow_flag(check_carry(7, a, value, sum.0) != state.get_cf());
     state.get_a_mut().0 = sum.0 as u8;
     state.flags_from_accumulator();
-}
-
-/// Add the value stored at the memory address to A, updating the flags
-#[inline]
-pub(crate) fn add_addr<S: I8080FamilyState>(
-    state: &mut S,
-    memory: &impl Memory,
-    address: u16,
-    carry: bool,
-) {
-    let value = memory.load(address);
-    add_value(state, value, carry);
 }
 
 /// Add the value of a register to A, updating the flags
@@ -169,16 +159,14 @@ pub(crate) fn add_r<S: I8080FamilyState>(
     state: &mut S,
     get_register: fn(&S) -> Wrapping<u8>,
 ) -> u8 {
-    let value = get_register(state).0;
-    add_value(state, value, false);
+    add_value(state, get_register(state).0, false);
     4
 }
 
 /// Add the value pointed by HL to A, updating the flags
 #[inline]
 pub(crate) fn add_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) -> u8 {
-    let address = state.get_hl();
-    add_addr(state, memory, address, false);
+    add_value(state, memory.load(state.get_hl()), false);
     7
 }
 
@@ -188,18 +176,15 @@ pub(crate) fn adc_r<S: I8080FamilyState>(
     state: &mut S,
     get_register: fn(&S) -> Wrapping<u8>,
 ) -> u8 {
-    let value = get_register(state).0;
-    let carry = state.get_cf();
-    add_value(state, value, carry);
+    add_value(state, get_register(state).0, state.get_cf());
     4
 }
 
-/// Add the value stored at the memory address the carry flag to A, updating the flags
+/// Add the value pointed by HL and the carry flag to A, updating the flags
 #[inline]
 pub(crate) fn adc_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) -> u8 {
-    let address = state.get_hl();
     let carry = state.get_cf();
-    add_addr(state, memory, address, carry);
+    add_value(state, memory.load(state.get_hl()), carry);
     7
 }
 
@@ -208,6 +193,37 @@ pub(crate) fn adc_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) 
 pub(crate) fn sub_value(state: &mut State, value: u8, carry: bool) {
     add_value(state, !value, !carry);
     state.cf = !state.cf;
+}
+
+/// Subtract the value of a register from A, updating the flags
+#[inline]
+pub(crate) fn sub_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
+    let value = get_register(state).0;
+    sub_value(state, value, false);
+    4
+}
+
+/// Subtract the value pointed by HL from A, updating the flags
+#[inline]
+pub(crate) fn sub_mem(state: &mut State, memory: &impl Memory) -> u8 {
+    sub_value(state, memory.load(state.get_hl()), false);
+    7
+}
+
+/// Subtract the value of a register and the carry flag from A, updating the flags
+#[inline]
+pub(crate) fn sbb_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
+    let value = get_register(state).0;
+    let carry = state.cf;
+    sub_value(state, value, carry);
+    4
+}
+
+/// Subtract the value pointed by HL and the carry flag from A, updating the flags
+#[inline]
+pub(crate) fn sbb_mem(state: &mut State, memory: &impl Memory) -> u8 {
+    sub_value(state, memory.load(state.get_hl()), state.cf);
+    7
 }
 
 /// Perform a logical AND between the value and the accumulator, updating the flags
@@ -221,30 +237,101 @@ pub(crate) fn and_value(state: &mut State, value: u8) {
     state.af = (a | value) & 0b1000 != 0;
 }
 
+/// Perform a logical AND between the register and the accumulator, updating the flags
+#[inline]
+pub(crate) fn ana_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
+    and_value(state, get_register(state).0);
+    4
+}
+
+/// Perform a logical AND between the value pointed by HL and the accumulator, updating the flags
+#[inline]
+pub(crate) fn ana_mem(state: &mut State, memory: &impl Memory) -> u8 {
+    let value = memory.load(state.get_hl());
+    and_value(state, value);
+    7
+}
+
 /// Perform a logical OR between the value and the accumulator, updating the flags
 #[inline]
-pub(crate) fn or_value(state: &mut State, value: u8) {
-    state.a.0 |= value;
+pub(crate) fn or_value(state: &mut impl I8080FamilyState, value: u8) {
+    state.get_a_mut().0 |= value;
     state.flags_from_accumulator();
-    state.cf = false;
-    state.af = false;
+    state.parity_from_accumulator();
+    state.set_cf(false);
+    state.set_hf(false);
+    state.set_nf(false);
+}
+
+/// Perform a logical OR between the register and the accumulator, updating the flags
+#[inline]
+pub(crate) fn ora_r<S: I8080FamilyState>(
+    state: &mut S,
+    get_register: fn(&S) -> Wrapping<u8>,
+) -> u8 {
+    or_value(state, get_register(state).0);
+    4
+}
+
+/// Perform a logical OR between the value pointed by HL and the accumulator, updating the flags
+#[inline]
+pub(crate) fn ora_mem(state: &mut State, memory: &impl Memory) -> u8 {
+    let value = memory.load(state.get_hl());
+    or_value(state, value);
+    7
 }
 
 /// Perform a logical XOR between the value and the accumulator, updating the flags
 #[inline]
-pub(crate) fn xor_value(state: &mut State, value: u8) {
-    state.a.0 ^= value;
+pub(crate) fn xor_value(state: &mut impl I8080FamilyState, value: u8) {
+    state.get_a_mut().0 ^= value;
     state.flags_from_accumulator();
-    state.cf = false;
-    state.af = false;
+    state.parity_from_accumulator();
+    state.set_cf(false);
+    state.set_hf(false);
+    state.set_nf(false);
+}
+
+/// Perform a logical XOR between the register and the accumulator, updating the flags
+#[inline]
+pub(crate) fn xra_r<S: I8080FamilyState>(
+    state: &mut S,
+    get_register: fn(&S) -> Wrapping<u8>,
+) -> u8 {
+    xor_value(state, get_register(state).0);
+    4
+}
+
+/// Perform a logical XOR between the value pointed by HL and the accumulator, updating the flags
+#[inline]
+pub(crate) fn xra_mem(state: &mut State, memory: &impl Memory) -> u8 {
+    let value = memory.load(state.get_hl());
+    xor_value(state, value);
+    7
 }
 
 /// Compare a value with the accumulator
+#[inline]
 pub(crate) fn cmp_value(state: &mut State, value: u8) {
     let (diff, carry) = state.a.0.overflowing_sub(value);
     state.cf = carry;
     state.flags_from_value(diff);
     state.af = (state.a.0 ^ diff ^ value) & 0x10 == 0;
+}
+
+/// Compare a register with the accumulator
+#[inline]
+pub(crate) fn cmp_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
+    cmp_value(state, get_register(state).0);
+    4
+}
+
+/// Compare a value in memory with the accumulator
+#[inline]
+pub(crate) fn cmp_mem(state: &mut State, memory: &impl Memory) -> u8 {
+    let value = memory.load(state.get_hl());
+    cmp_value(state, value);
+    7
 }
 
 /// Adjust the accumulator to BCD
@@ -278,4 +365,15 @@ pub(crate) fn cma(state: &mut State) -> u8 {
 pub(crate) fn cmc(state: &mut State) -> u8 {
     state.cf = !state.cf;
     4
+}
+
+/// Perform an ALU operation on an immediate value
+pub(crate) fn alu_imm<S: I8080FamilyState>(
+    state: &mut S,
+    operation: fn(&mut S, u8),
+    memory: &impl Memory,
+) -> u8 {
+    let value = state.fetch_byte(memory);
+    operation(state, value);
+    7
 }

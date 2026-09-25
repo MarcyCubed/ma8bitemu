@@ -65,9 +65,9 @@ impl crate::EmulatorCore for Emulator {
                 // LXI SP, d16
                 0x31 => load::lxi(&mut self.state, memory, |state, value| state.set_sp(value)),
                 // STAX B
-                0x02 => load::stax(&self.state, memory, |s| s.bc()),
+                0x02 => load::stax(&self.state, memory, |s| s.get_bc()),
                 // STAX D
-                0x12 => load::stax(&self.state, memory, |s| s.de()),
+                0x12 => load::stax(&self.state, memory, |s| s.get_de()),
                 // SHLD a16
                 0x22 => load::shld(&mut self.state, memory),
                 // STA a16
@@ -153,11 +153,11 @@ impl crate::EmulatorCore for Emulator {
                 // LDA a16
                 0x3a => load::lda(&mut self.state, memory),
                 // DCX B
-                0x0b => math::dcx(&mut self.state, State::bc, State::set_bc),
+                0x0b => math::dcx(&mut self.state, State::get_bc, State::set_bc),
                 // DCX D
-                0x1b => math::dcx(&mut self.state, State::de, State::set_de),
+                0x1b => math::dcx(&mut self.state, State::get_de, State::set_de),
                 // DCX H
-                0x2b => math::dcx(&mut self.state, State::hl, State::set_hl),
+                0x2b => math::dcx(&mut self.state, State::get_hl, State::set_hl),
                 // DCX SP
                 0x3b => math::dcx(&mut self.state, State::get_sp_u16, State::set_sp),
                 // RRC
@@ -253,7 +253,6 @@ impl crate::EmulatorCore for Emulator {
                 0x85 => math::add_r(&mut self.state, State::get_l),
                 0x86 => math::add_mem(&mut self.state, memory),
                 0x87 => math::add_r(&mut self.state, State::get_a),
-
                 // ADC
                 0x88 => math::adc_r(&mut self.state, State::get_b),
                 0x89 => math::adc_r(&mut self.state, State::get_c),
@@ -264,113 +263,81 @@ impl crate::EmulatorCore for Emulator {
                 0x8e => math::adc_mem(&mut self.state, memory),
                 0x8f => math::adc_r(&mut self.state, State::get_a),
                 // SUB
-                0x90..=0x97 => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    math::sub_value(&mut self.state, value, false);
-                    clock_cycles
-                }
+                0x90 => math::sub_r(&mut self.state, State::get_b),
+                0x91 => math::sub_r(&mut self.state, State::get_c),
+                0x92 => math::sub_r(&mut self.state, State::get_d),
+                0x93 => math::sub_r(&mut self.state, State::get_e),
+                0x94 => math::sub_r(&mut self.state, State::get_h),
+                0x95 => math::sub_r(&mut self.state, State::get_l),
+                0x96 => math::sub_mem(&mut self.state, memory),
+                0x97 => math::sub_r(&mut self.state, State::get_a),
                 // SBB
-                0x98..=0x9f => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    let carry = self.state.cf;
-                    math::sub_value(&mut self.state, value, carry);
-                    clock_cycles
-                }
+                0x98 => math::sbb_r(&mut self.state, State::get_b),
+                0x99 => math::sbb_r(&mut self.state, State::get_c),
+                0x9a => math::sbb_r(&mut self.state, State::get_d),
+                0x9b => math::sbb_r(&mut self.state, State::get_e),
+                0x9c => math::sbb_r(&mut self.state, State::get_h),
+                0x9d => math::sbb_r(&mut self.state, State::get_l),
+                0x9e => math::sbb_mem(&mut self.state, memory),
+                0x9f => math::sbb_r(&mut self.state, State::get_a),
                 // ANA
-                0xa0..=0xa7 => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    math::and_value(&mut self.state, value);
-                    clock_cycles
-                }
+                0xa0 => math::ana_r(&mut self.state, State::get_b),
+                0xa1 => math::ana_r(&mut self.state, State::get_c),
+                0xa2 => math::ana_r(&mut self.state, State::get_d),
+                0xa3 => math::ana_r(&mut self.state, State::get_e),
+                0xa4 => math::ana_r(&mut self.state, State::get_h),
+                0xa5 => math::ana_r(&mut self.state, State::get_l),
+                0xa6 => math::ana_mem(&mut self.state, memory),
+                0xa7 => math::ana_r(&mut self.state, State::get_a),
                 // XRA
-                0xa8..=0xaf => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    math::xor_value(&mut self.state, value);
-                    clock_cycles
-                }
+                0xa8 => math::xra_r(&mut self.state, State::get_b),
+                0xa9 => math::xra_r(&mut self.state, State::get_c),
+                0xaa => math::xra_r(&mut self.state, State::get_d),
+                0xab => math::xra_r(&mut self.state, State::get_e),
+                0xac => math::xra_r(&mut self.state, State::get_h),
+                0xad => math::xra_r(&mut self.state, State::get_l),
+                0xae => math::xra_mem(&mut self.state, memory),
+                0xaf => math::xra_r(&mut self.state, State::get_a),
                 // ORA
-                0xb0..=0xb7 => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    math::or_value(&mut self.state, value);
-                    clock_cycles
-                }
+                0xb0 => math::ora_r(&mut self.state, State::get_b),
+                0xb1 => math::ora_r(&mut self.state, State::get_c),
+                0xb2 => math::ora_r(&mut self.state, State::get_d),
+                0xb3 => math::ora_r(&mut self.state, State::get_e),
+                0xb4 => math::ora_r(&mut self.state, State::get_h),
+                0xb5 => math::ora_r(&mut self.state, State::get_l),
+                0xb6 => math::ora_mem(&mut self.state, memory),
+                0xb7 => math::ora_r(&mut self.state, State::get_a),
                 // CMP
-                0xb8..=0xbf => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    math::cmp_value(&mut self.state, value);
-                    clock_cycles
-                }
-                // RNZ, RZ, RNC, RC, RPO, RPE, RP, RM
-                0xc0 | 0xc8 | 0xd0 | 0xd8 | 0xe0 | 0xe8 | 0xf0 | 0xf8 => {
-                    let cond = self.state.opcode_to_condition(opcode);
-                    if jump::ret_if(&mut self.state, memory, cond) {
-                        11
-                    } else {
-                        5
-                    }
-                }
-                // RET
-                0xc9 | 0xd9 => {
-                    jump::ret(&mut self.state, memory);
-                    10
-                }
-                // POP B
-                0xc1 => {
-                    let bc = jump::pop(&mut self.state, memory);
-                    self.state.set_bc(bc);
-                    10
-                }
-                // POP D
-                0xd1 => {
-                    let de = jump::pop(&mut self.state, memory);
-                    self.state.set_de(de);
-                    10
-                }
-                // POP H
-                0xe1 => {
-                    let hl = jump::pop(&mut self.state, memory);
-                    self.state.set_hl(hl);
-                    10
-                }
-                // POP PSW
-                0xf1 => {
-                    let af = jump::pop(&mut self.state, memory).to_le_bytes();
-                    self.state.deserialize_flags(af[0]);
-                    self.state.a.0 = af[1];
-                    10
-                }
-                // JNZ, JZ, JNC, JC, JPO, JPE, JP, JM
-                0xc2 | 0xca | 0xd2 | 0xda | 0xe2 | 0xea | 0xf2 | 0xfa => {
-                    let address = self.fetch_word(memory);
-                    if self.state.opcode_to_condition(opcode) {
-                        self.state.pc.0 = address;
-                    }
-                    10
-                }
-                // JMP a16
-                0xc3 | 0xcb => {
-                    let address = self.fetch_word(memory);
-                    self.state.pc.0 = address;
-                    10
-                }
+                0xb8 => math::cmp_r(&mut self.state, State::get_b),
+                0xb9 => math::cmp_r(&mut self.state, State::get_c),
+                0xba => math::cmp_r(&mut self.state, State::get_d),
+                0xbb => math::cmp_r(&mut self.state, State::get_e),
+                0xbc => math::cmp_r(&mut self.state, State::get_h),
+                0xbd => math::cmp_r(&mut self.state, State::get_l),
+                0xbe => math::cmp_mem(&mut self.state, memory),
+                0xbf => math::cmp_r(&mut self.state, State::get_a),
+                0xc0 => jump::ret_cond(&mut self.state, memory, |s| !s.zf), // RNZ
+                0xc8 => jump::ret_cond(&mut self.state, memory, |s| s.zf),  // RZ
+                0xd0 => jump::ret_cond(&mut self.state, memory, |s| !s.cf), // RNC
+                0xd8 => jump::ret_cond(&mut self.state, memory, |s| s.cf),  // RC
+                0xe0 => jump::ret_cond(&mut self.state, memory, |s| !s.pf), // RPO
+                0xe8 => jump::ret_cond(&mut self.state, memory, |s| s.pf),  // RPE
+                0xf0 => jump::ret_cond(&mut self.state, memory, |s| !s.sf), // RP
+                0xf8 => jump::ret_cond(&mut self.state, memory, |s| s.sf),  // RM
+                0xc9 | 0xd9 => jump::ret(&mut self.state, memory),          // RET
+                0xc1 => jump::pop(&mut self.state, memory, State::set_bc),  // POP B
+                0xd1 => jump::pop(&mut self.state, memory, State::set_de),  // POP D
+                0xe1 => jump::pop(&mut self.state, memory, State::set_hl),  // POP E
+                0xf1 => jump::pop(&mut self.state, memory, State::set_af),  // POP PSW
+                0xc2 => jump::jp_cond_nn(&mut self.state, memory, |s| !s.zf), // JNZ
+                0xca => jump::jp_cond_nn(&mut self.state, memory, |s| s.zf), // JZ
+                0xd2 => jump::jp_cond_nn(&mut self.state, memory, |s| !s.cf), // JNC
+                0xda => jump::jp_cond_nn(&mut self.state, memory, |s| s.cf), // JC
+                0xe2 => jump::jp_cond_nn(&mut self.state, memory, |s| !s.pf), // JPO
+                0xea => jump::jp_cond_nn(&mut self.state, memory, |s| s.pf), // JPE
+                0xf2 => jump::jp_cond_nn(&mut self.state, memory, |s| !s.sf), // JP
+                0xfa => jump::jp_cond_nn(&mut self.state, memory, |s| s.sf), // JM
+                0xc3 | 0xcb => jump::jp_cond_nn(&mut self.state, memory, |_| true), // JMP
                 // OUT d8
                 0xd3 => {
                     let port = self.fetch_byte(memory);
@@ -383,137 +350,54 @@ impl crate::EmulatorCore for Emulator {
                     );
                 }
                 // XTHL
-                0xe3 => {
-                    let popped = jump::pop(&mut self.state, memory);
-                    let hl = self.state.hl();
-                    jump::push(&mut self.state, memory, hl);
-                    self.state.set_hl(popped);
-                    18
-                }
+                0xe3 => load::xthl(&mut self.state, memory, 18),
                 // DI
                 0xf3 => {
                     self.state.inte = false;
                     4
                 }
                 // CNZ, CZ, CNC, CC, CPO, CPE, CP, CM
-                0xc4 | 0xcc | 0xd4 | 0xdc | 0xe4 | 0xec | 0xf4 | 0xfc => {
-                    let address = self.fetch_word(memory);
-                    let cond = self.state.opcode_to_condition(opcode);
-                    if jump::call_if(&mut self.state, memory, cond, address) {
-                        17
-                    } else {
-                        11
-                    }
-                }
-                // CALL a16
+                0xc4 => jump::call_cond_nn(&mut self.state, memory, |s| !s.zf, 17, 11), // CNZ
+                0xcc => jump::call_cond_nn(&mut self.state, memory, |s| s.zf, 17, 11),  // CZ
+                0xd4 => jump::call_cond_nn(&mut self.state, memory, |s| !s.cf, 17, 11), // CNC
+                0xdc => jump::call_cond_nn(&mut self.state, memory, |s| s.cf, 17, 11),  // CC
+                0xe4 => jump::call_cond_nn(&mut self.state, memory, |s| !s.pf, 17, 11), // CPO
+                0xec => jump::call_cond_nn(&mut self.state, memory, |s| s.pf, 17, 11),  // CPE
+                0xf4 => jump::call_cond_nn(&mut self.state, memory, |s| !s.sf, 17, 11), // CP
+                0xfc => jump::call_cond_nn(&mut self.state, memory, |s| s.sf, 17, 11),  // CM
+                // CALL
                 0xcd | 0xdd | 0xed | 0xfd => {
-                    let address = self.fetch_word(memory);
-                    jump::call(&mut self.state, memory, address);
-                    17
+                    jump::call_cond_nn(&mut self.state, memory, |_| true, 17, 11)
                 }
-                // PUSH B
-                0xc5 => {
-                    let value = self.state.bc();
-                    jump::push(&mut self.state, memory, value);
-                    11
-                }
-                // PUSH D
-                0xd5 => {
-                    let value = self.state.de();
-                    jump::push(&mut self.state, memory, value);
-                    11
-                }
-                // PUSH H
-                0xe5 => {
-                    let value = self.state.hl();
-                    jump::push(&mut self.state, memory, value);
-                    11
-                }
-                // PUSH PSW
-                0xf5 => {
-                    let af = u16::from_le_bytes([self.state.serialize_flags(), self.state.a.0]);
-                    jump::push(&mut self.state, memory, af);
-                    11
-                }
-                // ADI d8
-                0xc6 => {
-                    let d8 = self.fetch_byte(memory);
-                    math::add_value(&mut self.state, d8, false);
-                    7
-                }
-                // ACI d8
-                0xce => {
-                    let d8 = self.fetch_byte(memory);
-                    let carry = self.state.cf;
-                    math::add_value(&mut self.state, d8, carry);
-                    7
-                }
-                // SUI d8
-                0xd6 => {
-                    let d8 = self.fetch_byte(memory);
-                    math::sub_value(&mut self.state, d8, false);
-                    7
-                }
-                // SBI d8
-                0xde => {
-                    let d8 = self.fetch_byte(memory);
-                    let carry = self.state.cf;
-                    math::sub_value(&mut self.state, d8, carry);
-                    7
-                }
-                // ANI d8
-                0xe6 => {
-                    let d8 = self.fetch_byte(memory);
-                    math::and_value(&mut self.state, d8);
-                    7
-                }
-                // XRI d8
-                0xee => {
-                    let d8 = self.fetch_byte(memory);
-                    math::xor_value(&mut self.state, d8);
-                    7
-                }
-                // ORI d8
-                0xf6 => {
-                    let d8 = self.fetch_byte(memory);
-                    math::or_value(&mut self.state, d8);
-                    7
-                }
-                // CPI d8
-                0xfe => {
-                    let d8 = self.fetch_byte(memory);
-                    math::cmp_value(&mut self.state, d8);
-                    7
-                }
+                0xc5 => jump::push(&mut self.state, memory, State::get_bc), // PUSH B
+                0xd5 => jump::push(&mut self.state, memory, State::get_de), // PUSH D
+                0xe5 => jump::push(&mut self.state, memory, State::get_hl), // PUSH H
+                0xf5 => jump::push(&mut self.state, memory, State::get_af), // PUSH PSW
+                0xc6 => math::alu_imm(&mut self.state, |s, v| math::add_value(s, v, false), memory), // ADI
+                0xce => math::alu_imm(&mut self.state, |s, v| math::add_value(s, v, s.cf), memory), // ACI
+                0xd6 => math::alu_imm(&mut self.state, |s, v| math::sub_value(s, v, false), memory), // SUI
+                0xde => math::alu_imm(&mut self.state, |s, v| math::sub_value(s, v, s.cf), memory), // SBI
+                0xe6 => math::alu_imm(&mut self.state, math::and_value, memory), // ANI
+                0xee => math::alu_imm(&mut self.state, math::xor_value, memory), // XRI
+                0xf6 => math::alu_imm(&mut self.state, math::or_value, memory),  // ORI
+                0xfe => math::alu_imm(&mut self.state, math::cmp_value, memory), // CPI
                 // RST
-                0xc7 | 0xcf | 0xd7 | 0xdf | 0xe7 | 0xef | 0xf7 | 0xff => {
-                    let address = (opcode & 0b111000) as u16;
-                    jump::call(&mut self.state, memory, address);
-                    11
-                }
-                // PCHL
-                0xe9 => {
-                    self.state.pc.0 = self.state.hl();
-                    5
-                }
-                // SPHL
-                0xf9 => {
-                    self.state.sp.0 = self.state.hl();
-                    5
-                }
+                0xc7 => jump::rst(&mut self.state, memory, 0x00),
+                0xcf => jump::rst(&mut self.state, memory, 0x08),
+                0xd7 => jump::rst(&mut self.state, memory, 0x10),
+                0xdf => jump::rst(&mut self.state, memory, 0x18),
+                0xe7 => jump::rst(&mut self.state, memory, 0x20),
+                0xef => jump::rst(&mut self.state, memory, 0x28),
+                0xf7 => jump::rst(&mut self.state, memory, 0x30),
+                0xff => jump::rst(&mut self.state, memory, 0x38),
+                0xe9 => jump::jp_hl(&mut self.state, 5), // PCHL
+                0xf9 => load::sphl(&mut self.state, 5),  // SPHL
                 // IN d8
                 0xdb => {
                     let port = self.fetch_byte(memory);
                     break 'main (10, ExecEffect::In { port });
                 }
-                // XCHG
-                0xeb => {
-                    let de = self.state.de();
-                    let hl = self.state.hl();
-                    self.state.set_hl(de);
-                    self.state.set_de(hl);
-                    4
-                }
+                0xeb => load::xchg(&mut self.state), // XCHG
                 // EI
                 0xfb => {
                     self.state.inte = true;
