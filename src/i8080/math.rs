@@ -48,7 +48,7 @@ fn inc_value(state: &mut impl I8080FamilyState, value: Wrapping<u8>) -> Wrapping
     new_value += 1;
     state.flags_from_value(new_value.0);
     state.overflow_flag((1 << 7) & (value.0 ^ new_value.0) != 0);
-    state.set_af((1 << State::A_FLAG_BIT) & (value.0 ^ new_value.0) != 0);
+    state.set_af(0x10 & (value.0 ^ new_value.0) != 0);
     state.set_nf(false);
     new_value
 }
@@ -63,10 +63,7 @@ pub(crate) fn inc_mem<S: I8080FamilyState>(state: &mut S, memory: &mut impl Memo
 
 /// Decrement a register and set the appropriate flags
 #[inline]
-pub(crate) fn dec<S: I8080FamilyState>(
-    state: &mut S,
-    get_register: impl Fn(&mut S) -> &mut Wrapping<u8>,
-) -> u8 {
+pub(crate) fn dec(state: &mut State, get_register: impl Fn(&mut State) -> &mut Wrapping<u8>) -> u8 {
     let old_value = *get_register(state);
     let new_value = dec_value(state, old_value);
     *get_register(state) = new_value;
@@ -77,19 +74,17 @@ pub(crate) fn dec<S: I8080FamilyState>(
 ///
 /// Return the decremented value.
 #[inline]
-fn dec_value(state: &mut impl I8080FamilyState, value: Wrapping<u8>) -> Wrapping<u8> {
+fn dec_value(state: &mut State, value: Wrapping<u8>) -> Wrapping<u8> {
     let mut new_value = value;
     new_value -= 1;
     state.flags_from_value(new_value.0);
-    state.overflow_flag((1 << 7) & (value.0 ^ new_value.0) != 0);
-    state.set_af(new_value.0 & 0xf != 0xf);
-    state.set_nf(true);
+    state.af = new_value.0 & 0xf != 0xf;
     new_value
 }
 
 /// Decrements the value in memory pointed by HL
-pub(crate) fn dec_mem<S: I8080FamilyState>(state: &mut S, memory: &mut impl Memory) -> u8 {
-    let address = state.get_hl();
+pub(crate) fn dec_mem(state: &mut State, memory: &mut impl Memory) -> u8 {
+    let address = state.hl();
     let value = dec_value(state, Wrapping(memory.load(address)));
     memory.store(address, value.0);
     10
@@ -135,17 +130,77 @@ pub(crate) fn dad(state: &mut State, register: fn(&State) -> u16) -> u8 {
     10
 }
 
+/// Check if the operation `a + b = c` had a carry on the specified bit.
+pub(crate) fn check_carry(bit: u32, a: u16, b: u16, sum: u16) -> bool {
+    (sum ^ a ^ b) & (1 << bit) != 0
+}
+
 /// Add a value and a carry to A, updating the flags
 #[inline]
-pub(crate) fn add_value(state: &mut State, value: u8, carry: bool) {
-    let mut sum = Wrapping(state.a.0 as u16);
-    sum += value as u16;
+pub(crate) fn add_value(state: &mut impl I8080FamilyState, value: u8, carry: bool) {
+    let a = state.get_a().0 as u16;
+    let value = value as u16;
+    let mut sum = Wrapping(a);
+    sum += value;
     sum += carry as u16;
-    state.cf = sum.0 & (1 << 8) != 0;
-    let sum = sum.0 as u8;
-    state.af = (sum ^ value ^ state.a.0) & 0x10 != 0;
-    state.a.0 = sum;
-    state.flags_from_value(sum);
+    state.set_nf(false);
+    state.set_cf(sum.0 & (1 << 8) != 0);
+    state.set_af(check_carry(4, a, value, sum.0));
+    state.overflow_flag(check_carry(7, a, value, sum.0) != state.get_cf());
+    state.get_a_mut().0 = sum.0 as u8;
+    state.flags_from_accumulator();
+}
+
+/// Add the value stored at the memory address to A, updating the flags
+#[inline]
+pub(crate) fn add_addr<S: I8080FamilyState>(
+    state: &mut S,
+    memory: &impl Memory,
+    address: u16,
+    carry: bool,
+) {
+    let value = memory.load(address);
+    add_value(state, value, carry);
+}
+
+/// Add the value of a register to A, updating the flags
+#[inline]
+pub(crate) fn add_r<S: I8080FamilyState>(
+    state: &mut S,
+    get_register: fn(&S) -> Wrapping<u8>,
+) -> u8 {
+    let value = get_register(state).0;
+    add_value(state, value, false);
+    4
+}
+
+/// Add the value pointed by HL to A, updating the flags
+#[inline]
+pub(crate) fn add_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) -> u8 {
+    let address = state.get_hl();
+    add_addr(state, memory, address, false);
+    7
+}
+
+/// Add the value of a register and the carry flag to A, updating the flags
+#[inline]
+pub(crate) fn adc_r<S: I8080FamilyState>(
+    state: &mut S,
+    get_register: fn(&S) -> Wrapping<u8>,
+) -> u8 {
+    let value = get_register(state).0;
+    let carry = state.get_cf();
+    add_value(state, value, carry);
+    4
+}
+
+/// Add the value stored at the memory address the carry flag to A, updating the flags
+#[inline]
+pub(crate) fn adc_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) -> u8 {
+    let address = state.get_hl();
+    let carry = state.get_cf();
+    add_addr(state, memory, address, carry);
+    7
 }
 
 /// Subtract a value and a borrow from A, updating the flags
@@ -153,7 +208,6 @@ pub(crate) fn add_value(state: &mut State, value: u8, carry: bool) {
 pub(crate) fn sub_value(state: &mut State, value: u8, carry: bool) {
     add_value(state, !value, !carry);
     state.cf = !state.cf;
-    //state.af = !state.af;
 }
 
 /// Perform a logical AND between the value and the accumulator, updating the flags
@@ -205,5 +259,23 @@ pub(crate) fn daa(state: &mut State) -> u8 {
     let old_cf = state.cf;
     add_value(state, diff, false);
     state.cf |= old_cf;
+    4
+}
+
+/// Set the carry flag
+pub(crate) fn stc(state: &mut State) -> u8 {
+    state.cf = true;
+    4
+}
+
+/// Complement of A
+pub(crate) fn cma(state: &mut State) -> u8 {
+    state.a = !state.a;
+    4
+}
+
+/// Invert the carry flag
+pub(crate) fn cmc(state: &mut State) -> u8 {
+    state.cf = !state.cf;
     4
 }

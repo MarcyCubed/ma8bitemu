@@ -74,19 +74,6 @@ impl State {
         }
     }
 
-    /// Get the Z, S and P flags from a value
-    pub fn flags_from_value(&mut self, value: u8) {
-        self.zf = value == 0;
-        self.sf = value & (1 << 7) != 0;
-        self.pf = value.count_ones() & 1 == 0;
-    }
-
-    /// Get the Z, S and P flags from the accumulator
-    pub fn flags_from_accumulator(&mut self) {
-        let a = self.a.0;
-        self.flags_from_value(a);
-    }
-
     /// Get the value of the BC register pair
     pub fn bc(&self) -> u16 {
         u16::from_le_bytes([self.c.0, self.b.0])
@@ -273,12 +260,19 @@ impl I8080FamilyState for State {
 
     #[inline]
     fn flags_from_value(&mut self, value: u8) {
-        State::flags_from_value(self, value)
+        self.zf = value == 0;
+        self.sf = value & (1 << 7) != 0;
+        self.pf = value.count_ones() & 1 == 0;
     }
 
     #[inline]
     fn overflow_flag(&mut self, _overflow: bool) {
         // No overflow in 8080
+    }
+
+    #[inline]
+    fn parity_flag(&mut self, _value: u8) {
+        // Already done by flags_from_value
     }
 
     /// Turn the flags into the F register

@@ -135,10 +135,7 @@ impl crate::EmulatorCore for Emulator {
                 // DAA
                 0x27 => math::daa(&mut self.state),
                 // STC
-                0x37 => {
-                    self.state.cf = true;
-                    4
-                }
+                0x37 => math::stc(&mut self.state),
                 // DAD B
                 0x09 => math::dad(&mut self.state, State::get_bc),
                 // DAD D
@@ -168,15 +165,9 @@ impl crate::EmulatorCore for Emulator {
                 // RAR
                 0x1F => math::rar(&mut self.state),
                 // CMA
-                0x2f => {
-                    self.state.a = !self.state.a;
-                    4
-                }
+                0x2f => math::cma(&mut self.state),
                 // CMC
-                0x3f => {
-                    self.state.cf = !self.state.cf;
-                    4
-                }
+                0x3f => math::cmc(&mut self.state),
                 // MOV X, X
                 0x40 => 5, // B, B
                 0x41 => load::mov(&mut self.state, State::get_b_mut, State::get_c, 5),
@@ -253,25 +244,25 @@ impl crate::EmulatorCore for Emulator {
                     self.state.pc -= 1;
                     break 'main (7, ExecEffect::Halt);
                 }
-                // ADD
-                0x80..=0x87 => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    math::add_value(&mut self.state, value, false);
-                    clock_cycles
-                }
+                // ADD X
+                0x80 => math::add_r(&mut self.state, State::get_b),
+                0x81 => math::add_r(&mut self.state, State::get_c),
+                0x82 => math::add_r(&mut self.state, State::get_d),
+                0x83 => math::add_r(&mut self.state, State::get_e),
+                0x84 => math::add_r(&mut self.state, State::get_h),
+                0x85 => math::add_r(&mut self.state, State::get_l),
+                0x86 => math::add_mem(&mut self.state, memory),
+                0x87 => math::add_r(&mut self.state, State::get_a),
+
                 // ADC
-                0x88..=0x8f => {
-                    let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {
-                        None => (memory.load(self.state.hl()), 7),
-                        Some(n) => (n, 4),
-                    };
-                    let carry = self.state.cf;
-                    math::add_value(&mut self.state, value, carry);
-                    clock_cycles
-                }
+                0x88 => math::adc_r(&mut self.state, State::get_b),
+                0x89 => math::adc_r(&mut self.state, State::get_c),
+                0x8a => math::adc_r(&mut self.state, State::get_d),
+                0x8b => math::adc_r(&mut self.state, State::get_e),
+                0x8c => math::adc_r(&mut self.state, State::get_h),
+                0x8d => math::adc_r(&mut self.state, State::get_l),
+                0x8e => math::adc_mem(&mut self.state, memory),
+                0x8f => math::adc_r(&mut self.state, State::get_a),
                 // SUB
                 0x90..=0x97 => {
                     let (value, clock_cycles) = match self.state.source_from_opcode(opcode) {

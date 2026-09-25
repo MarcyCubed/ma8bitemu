@@ -97,8 +97,18 @@ pub trait I8080FamilyState {
     /// Set the flags from a value
     fn flags_from_value(&mut self, value: u8);
 
+    /// Get the default flags from the accumulator
+    #[inline]
+    fn flags_from_accumulator(&mut self) {
+        let a = self.get_a().0;
+        self.flags_from_value(a);
+    }
+
     /// Set the overflow flag to the boolean value
     fn overflow_flag(&mut self, overflow: bool);
+
+    /// Set the parity flag from a value
+    fn parity_flag(&mut self, value: u8);
 
     /// Turn the flags into a bitmap
     fn serialize_flags(&self) -> u8;
