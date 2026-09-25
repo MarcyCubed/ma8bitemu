@@ -1,10 +1,10 @@
 //! Intel 8080 emulator
 
 pub mod emulator;
-mod jump;
+pub(crate) mod jump;
 pub(crate) mod load;
-mod math;
-mod state;
+pub(crate) mod math;
+pub mod state;
 
 use core::num::Wrapping;
 // Re-export the emulator with a shorter name
