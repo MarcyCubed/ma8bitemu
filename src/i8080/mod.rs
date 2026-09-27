@@ -210,6 +210,9 @@ pub trait I8080FamilyState {
     /// Also shows the opcode if it's known.
     #[cfg(feature = "std")]
     fn dump(&self, opcode: u8);
+
+    /// Sets the value of the internal register memptr
+    fn set_memptr(&mut self, address: u16);
 }
 
 impl<T: I8080FamilyState> Fetch for T {

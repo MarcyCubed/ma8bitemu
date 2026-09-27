@@ -5,6 +5,7 @@ use crate::memory::Memory;
 use crate::z80::state::State;
 use crate::z80::z8080;
 use crate::{ExecEffect, Fetch, i8080};
+use core::mem;
 
 /// The Z80 emulator
 #[derive(Debug, Clone)]
@@ -27,6 +28,20 @@ impl Emulator {
             last_effect: ExecEffect::Normal,
             interrupt_vector: None,
             nmi_pending: false,
+        }
+    }
+
+    /// Relative jump instruction
+    fn jr(&mut self, cond: fn(&State) -> bool, memory: &impl Memory) -> u8 {
+        let d = self.fetch_byte(memory);
+        self.state.mem_ptr = self.state.pc;
+        self.state.mem_ptr += d as u16;
+
+        if cond(&self.state) {
+            self.state.pc = self.state.mem_ptr;
+            12
+        } else {
+            7
         }
     }
 }
@@ -75,6 +90,9 @@ impl Fetch for Emulator {
 }
 impl crate::EmulatorCore for Emulator {
     fn run_opcode(&mut self, opcode: u8, memory: &mut impl Memory) -> (u8, ExecEffect) {
+        // Increase the R register
+        self.state.inc_r();
+        // Execute the instruction
         let result = 'main: {
             let clock_cycles = match opcode {
                 0x00 => 4, // nop
@@ -94,10 +112,10 @@ impl crate::EmulatorCore for Emulator {
                 0x31 => {
                     i8080::load::lxi(&mut self.state, memory, |state, value| state.set_sp(value))
                 }
-                0x02 => i8080::load::stax(&self.state, memory, |s| s.get_bc()), // ld (bc), a
-                0x12 => i8080::load::stax(&self.state, memory, |s| s.get_de()), // ld (de), a
-                0x22 => i8080::load::shld(&mut self.state, memory),             // ld (nn), hl
-                0x32 => i8080::load::sta(&mut self.state, memory),              // ld (nn), a
+                0x02 => i8080::load::stax(&mut self.state, memory, |s| s.get_bc()), // ld (bc), a
+                0x12 => i8080::load::stax(&mut self.state, memory, |s| s.get_de()), // ld (de), a
+                0x22 => i8080::load::shld(&mut self.state, memory),                 // ld (nn), hl
+                0x32 => i8080::load::sta(&mut self.state, memory),                  // ld (nn), a
                 0x03 => i8080::math::inx(&mut self.state, State::get_bc, State::set_bc), // inc bc
                 0x13 => i8080::math::inx(&mut self.state, State::get_de, State::set_de), // inc de
                 0x23 => i8080::math::inx(&mut self.state, State::get_hl, State::set_hl), // inc HL
@@ -130,7 +148,7 @@ impl crate::EmulatorCore for Emulator {
                 0x2e => i8080::load::mvi(&mut self.state, memory, State::get_l_mut), // ld l, n
                 0x3e => i8080::load::mvi(&mut self.state, memory, State::get_a_mut), // ld a, n
                 0x36 => i8080::load::mvi_mem(&mut self.state, memory),               // ld (hl), n
-                0x07 => i8080::math::rlc(&mut self.state),                           // rlca
+                0x07 => z8080::rlca(&mut self.state),                                // rlca
                 0x17 => i8080::math::ral(&mut self.state),                           // rla
                 0x27 => z8080::daa(&mut self.state),                                 // daa
                 0x37 => z8080::scf(&mut self.state),                                 // sfc
@@ -166,7 +184,7 @@ impl crate::EmulatorCore for Emulator {
                 0x1b => i8080::math::dcx(&mut self.state, State::get_de, State::set_de), // dec de
                 0x2b => i8080::math::dcx(&mut self.state, State::get_hl, State::set_hl), // dec hl
                 0x3b => i8080::math::dcx(&mut self.state, State::get_sp_u16, State::set_sp), // dec sp
-                0x0f => i8080::math::rrc(&mut self.state),                                   // rrca
+                0x0f => z8080::rrca(&mut self.state),                                        // rrca
                 0x1F => i8080::math::rar(&mut self.state),                                   // rra
                 0x2f => z8080::cpl(&mut self.state),                                         // cpl
                 0x3f => z8080::ccf(&mut self.state),                                         // ccf
@@ -349,7 +367,7 @@ impl crate::EmulatorCore for Emulator {
                 0xea => i8080::jump::jp_cond_nn(&mut self.state, memory, |s| s.pf), // JPE
                 0xf2 => i8080::jump::jp_cond_nn(&mut self.state, memory, |s| !s.sf), // JP
                 0xfa => i8080::jump::jp_cond_nn(&mut self.state, memory, |s| s.sf), // JM
-                0xc3 | 0xcb => i8080::jump::jp_cond_nn(&mut self.state, memory, |_| true), // JMP
+                0xc3 => i8080::jump::jp_cond_nn(&mut self.state, memory, |_| true), // JMP
                 // OUT d8
                 0xd3 => {
                     let port = self.fetch_byte(memory);
@@ -446,10 +464,46 @@ impl crate::EmulatorCore for Emulator {
                     self.state.iff2 = true;
                     break 'main (4, ExecEffect::InterruptDelay);
                 }
-                // unimplemented
-                _ => {
-                    unimplemented!("Work in progress")
+                // New Z80 instructions
+
+                // ex af, af'
+                0x08 => {
+                    mem::swap(&mut self.state.a, &mut self.state.a_alt);
+                    let flags = self.state.serialize_flags();
+                    self.state.deserialize_flags(self.state.f_alt);
+                    self.state.f_alt = flags;
+                    4
                 }
+                // djnz d
+                0x10 => {
+                    let d = self.fetch_byte(memory);
+                    self.state.b -= 1;
+                    if self.state.b.0 == 0 {
+                        8
+                    } else {
+                        self.state.pc += d as u16;
+                        11
+                    }
+                }
+                0x18 => self.jr(|_| true, memory),  // jr d
+                0x20 => self.jr(|s| !s.zf, memory), // jr nz, d
+                0x28 => self.jr(|s| s.zf, memory),  // jr z, d
+                0x30 => self.jr(|s| !s.cf, memory), // jr nc, d
+                0x38 => self.jr(|s| s.cf, memory),  // jr c, d
+                // exx
+                0xd9 => {
+                    mem::swap(&mut self.state.b, &mut self.state.b_alt);
+                    mem::swap(&mut self.state.c, &mut self.state.c_alt);
+                    mem::swap(&mut self.state.d, &mut self.state.d_alt);
+                    mem::swap(&mut self.state.e, &mut self.state.e_alt);
+                    mem::swap(&mut self.state.h, &mut self.state.h_alt);
+                    mem::swap(&mut self.state.l, &mut self.state.l_alt);
+                    4
+                }
+                0xcb => todo!("Bit instructions"),
+                0xdd => todo!("IX instructions"),
+                0xed => todo!("Misc instructions"),
+                0xfd => todo!("IY instructions"),
             };
             (clock_cycles, ExecEffect::Normal)
         };

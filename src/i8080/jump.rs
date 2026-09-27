@@ -22,8 +22,9 @@ pub(crate) fn ret_cond<S: I8080FamilyState, F: Fn(&S) -> bool>(
 /// Perform a return
 #[inline]
 pub(crate) fn ret(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8 {
-    let pc = pop_stack(state, memory);
-    state.set_pc(pc);
+    let address = pop_stack(state, memory);
+    state.set_pc(address);
+    state.set_memptr(address);
     10
 }
 
@@ -81,6 +82,7 @@ pub(crate) fn call_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
     clock_cycles_if_false: u8,
 ) -> u8 {
     let address = state.fetch_word(memory);
+    state.set_memptr(address);
     if cond(state) {
         call_address(state, memory, address);
         clock_cycles_if_true
@@ -109,6 +111,7 @@ pub(crate) fn jp_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
     cond: F,
 ) -> u8 {
     let address = state.fetch_word(memory);
+    state.set_memptr(address);
     if cond(state) {
         state.set_pc(address);
     }
@@ -117,6 +120,7 @@ pub(crate) fn jp_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
 
 /// RST instruction
 pub(crate) fn rst(state: &mut impl I8080FamilyState, memory: &mut impl Memory, address: u16) -> u8 {
+    state.set_memptr(address);
     call_address(state, memory, address);
     11
 }

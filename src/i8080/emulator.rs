@@ -65,9 +65,9 @@ impl crate::EmulatorCore for Emulator {
                 // LXI SP, d16
                 0x31 => load::lxi(&mut self.state, memory, |state, value| state.set_sp(value)),
                 // STAX B
-                0x02 => load::stax(&self.state, memory, |s| s.get_bc()),
+                0x02 => load::stax(&mut self.state, memory, |s| s.get_bc()),
                 // STAX D
-                0x12 => load::stax(&self.state, memory, |s| s.get_de()),
+                0x12 => load::stax(&mut self.state, memory, |s| s.get_de()),
                 // SHLD a16
                 0x22 => load::shld(&mut self.state, memory),
                 // STA a16

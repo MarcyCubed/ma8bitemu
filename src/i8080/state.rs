@@ -289,6 +289,10 @@ impl I8080FamilyState for State {
 
         println!();
     }
+
+    fn set_memptr(&mut self, _address: u16) {
+        // Nothing to do
+    }
 }
 
 #[cfg(test)]

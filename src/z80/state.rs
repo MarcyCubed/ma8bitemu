@@ -38,7 +38,7 @@ pub struct State {
     /// Alternate register A
     pub a_alt: Wrapping<u8>,
     /// Alternate register F
-    pub f_alt: Wrapping<u8>,
+    pub f_alt: u8,
     /// Alternate register B
     pub b_alt: Wrapping<u8>,
     /// Alternate register C
@@ -54,7 +54,7 @@ pub struct State {
     /// Interrupt page address register
     pub i: u8,
     /// Memory refresh register
-    pub r: u8,
+    pub r: Wrapping<u8>,
     /// Carry flag
     pub cf: bool,
     /// Parity / Overflow flag
@@ -72,7 +72,7 @@ pub struct State {
     /// Undocumented flag Y
     pub yf: bool,
     /// Undocumented register `MEMPTR`
-    pub mem_ptr: u16,
+    pub mem_ptr: Wrapping<u16>,
 }
 
 /// How the processor handles interruptions
@@ -142,7 +142,7 @@ impl State {
             h_alt: Default::default(),
             l_alt: Default::default(),
             i: 0,
-            r: 0,
+            r: Default::default(),
             cf: true,
             pf: true,
             zf: true,
@@ -151,7 +151,7 @@ impl State {
             nf: true,
             xf: true,
             yf: true,
-            mem_ptr: 0,
+            mem_ptr: Default::default(),
         }
     }
 
@@ -164,6 +164,15 @@ impl State {
     /// Set the X and Y flags from the accumulator
     pub fn xy_from_accumulator(&mut self) {
         self.xy_from_value(self.a.0)
+    }
+
+    /// Increment the R register
+    pub fn inc_r(&mut self) {
+        const MASK: u8 = 1 << 7;
+        let msb = self.r.0 & MASK;
+        self.r += 1;
+        self.r &= !MASK;
+        self.r |= msb;
     }
 }
 
@@ -383,8 +392,8 @@ impl I8080FamilyState for State {
         print!(",hl={:04x}h", self.get_hl());
         print!(",ix={:04x}h", self.ix);
         print!(",iy={:04x}h", self.iy);
-        print!(",i={:02x}h", opcode);
-        print!(",r={:02x}h", opcode);
+        print!(",i={:02x}h", self.i);
+        print!(",r={:02x}h", self.r);
         print!(",af'={:02x}{:02x}h", self.a_alt, self.f_alt);
         print!(",bc'={:02x}{:02x}h", self.b_alt, self.c_alt);
         print!(",de'={:02x}{:02x}h", self.d_alt, self.e_alt);
@@ -398,5 +407,9 @@ impl I8080FamilyState for State {
         print!(",memptr={:04x}h", self.mem_ptr);
 
         println!();
+    }
+
+    fn set_memptr(&mut self, address: u16) {
+        self.mem_ptr.0 = address
     }
 }

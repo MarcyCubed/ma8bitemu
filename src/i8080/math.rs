@@ -48,7 +48,7 @@ fn inc_value(state: &mut impl I8080FamilyState, value: Wrapping<u8>) -> Wrapping
     let mut new_value = value;
     new_value += 1;
     state.flags_from_value(new_value.0);
-    state.overflow_flag((1 << 7) & (value.0 ^ new_value.0) != 0);
+    state.overflow_flag(new_value.0 == 1 << 7);
     state.set_hf(0x10 & (value.0 ^ new_value.0) != 0);
     state.set_nf(false);
     new_value
@@ -92,9 +92,9 @@ pub(crate) fn dec_mem(state: &mut State, memory: &mut impl Memory) -> u8 {
 }
 
 /// Rotate the accumulator left and copy the original most significant bit to the carry flag
-pub(crate) fn rlc(state: &mut impl I8080FamilyState) -> u8 {
-    state.get_a_mut().0 = state.get_a().0.rotate_left(1);
-    state.set_cf(state.get_a().0 & 0x1 != 0);
+pub(super) fn rlc(state: &mut State) -> u8 {
+    state.a.0 = state.a.0.rotate_left(1);
+    state.cf = state.a.0 & 0x1 != 0;
     4
 }
 
@@ -108,9 +108,9 @@ pub(crate) fn ral(state: &mut impl I8080FamilyState) -> u8 {
 }
 
 /// Rotate the accumulator right and copy the original least significant bit to the carry flag
-pub(crate) fn rrc(state: &mut impl I8080FamilyState) -> u8 {
-    state.set_cf(state.get_a().0 & 0x1 != 0);
-    state.get_a_mut().0 = state.get_a().0.rotate_right(1);
+pub(super) fn rrc(state: &mut State) -> u8 {
+    state.cf = state.get_a().0 & 0x1 != 0;
+    state.a.0 = state.a.0.rotate_right(1);
     4
 }
 

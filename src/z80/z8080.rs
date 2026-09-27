@@ -24,7 +24,7 @@ fn sub_flags(state: &mut State, a: u8, b: u8, borrow: bool) -> u8 {
 }
 
 /// Subtract a value and a borrow from A, updating the flags
-pub(crate) fn sub_value(state: &mut State, value: u8, borrow: bool) {
+pub(super) fn sub_value(state: &mut State, value: u8, borrow: bool) {
     state.a.0 = sub_flags(state, state.a.0, value, borrow);
 }
 
@@ -32,11 +32,11 @@ pub(crate) fn sub_value(state: &mut State, value: u8, borrow: bool) {
 ///
 /// Return the decremented value.
 #[inline]
-pub(crate) fn dec_flags(state: &mut State, value: u8) -> u8 {
+pub(super) fn dec_flags(state: &mut State, value: u8) -> u8 {
     let new_value = value.wrapping_sub(1);
     state.flags_from_value(new_value);
-    state.pf = (1 << 7) & (value ^ new_value) != 0;
-    state.hf = new_value & 0xf != 0xf;
+    state.pf = new_value == 0x7f;
+    state.hf = (new_value ^ value) & (1 << State::H_FLAG_BIT) != 0;
     state.nf = true;
     new_value
 }
@@ -45,7 +45,7 @@ pub(crate) fn dec_flags(state: &mut State, value: u8) -> u8 {
 ///
 /// Return the number of clock cycles it takes to execute the instruction
 #[inline]
-pub(crate) fn dec_r(
+pub(super) fn dec_r(
     state: &mut State,
     get_register: impl Fn(&mut State) -> &mut Wrapping<u8>,
 ) -> u8 {
@@ -58,7 +58,7 @@ pub(crate) fn dec_r(
 /// Decrement a value in memory and set the appropriate flags
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(crate) fn dec_mem(state: &mut State, memory: &mut impl Memory, address: u16, cycles: u8) -> u8 {
+pub(super) fn dec_mem(state: &mut State, memory: &mut impl Memory, address: u16, cycles: u8) -> u8 {
     let value = dec_flags(state, memory.load(address));
     memory.store(address, value);
     cycles
@@ -67,7 +67,7 @@ pub(crate) fn dec_mem(state: &mut State, memory: &mut impl Memory, address: u16,
 /// Adjust a BCD value after a math operation
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(crate) fn daa(state: &mut State) -> u8 {
+pub(super) fn daa(state: &mut State) -> u8 {
     let a = state.a.0;
 
     let mut diff = 0;
@@ -78,11 +78,13 @@ pub(crate) fn daa(state: &mut State) -> u8 {
         diff += 0x60;
     }
 
+    let carry = state.cf;
     if state.nf {
         sub_value(state, diff, false);
     } else {
         add_value(state, diff, false);
     };
+    state.cf |= carry;
 
     state.parity_from_accumulator();
     4
@@ -91,7 +93,7 @@ pub(crate) fn daa(state: &mut State) -> u8 {
 /// Set the carry flag
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(crate) fn scf(state: &mut State) -> u8 {
+pub(super) fn scf(state: &mut State) -> u8 {
     state.xy_from_accumulator();
     state.cf = true;
     state.nf = false;
@@ -100,8 +102,9 @@ pub(crate) fn scf(state: &mut State) -> u8 {
 }
 
 /// Add a 16-bit value to HL and set the flags.
-pub(crate) fn add_hl_value(state: &mut State, value: u16) {
-    state.mem_ptr = (state.a.0 as u16).wrapping_add(1);
+pub(super) fn add_hl_value(state: &mut State, value: u16) {
+    state.mem_ptr.0 = state.get_hl();
+    state.mem_ptr += 1;
     let (result, carry) = state.get_hl().overflowing_add(value);
     state.nf = false;
     state.cf = carry;
@@ -109,7 +112,7 @@ pub(crate) fn add_hl_value(state: &mut State, value: u16) {
     state.hf = check_carry(
         State::H_FLAG_BIT,
         state.h.0 as u16,
-        value,
+        value >> 8,
         result_high as u16,
     );
     state.xy_from_value(result_high);
@@ -120,7 +123,7 @@ pub(crate) fn add_hl_value(state: &mut State, value: u16) {
 /// Complement of the accumulator
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(crate) fn cpl(state: &mut State) -> u8 {
+pub(super) fn cpl(state: &mut State) -> u8 {
     state.a.0 = !state.a.0;
     state.nf = true;
     state.hf = true;
@@ -131,7 +134,7 @@ pub(crate) fn cpl(state: &mut State) -> u8 {
 /// Invert the carry flag
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(crate) fn ccf(state: &mut State) -> u8 {
+pub(super) fn ccf(state: &mut State) -> u8 {
     state.hf = state.cf;
     state.cf = !state.cf;
     state.nf = false;
@@ -143,7 +146,7 @@ pub(crate) fn ccf(state: &mut State) -> u8 {
 /// Perform a logical AND between the value and the accumulator, updating the flags
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(crate) fn and_value(state: &mut State, value: u8) -> u8 {
+pub(super) fn and_value(state: &mut State, value: u8) -> u8 {
     state.a.0 &= value;
     state.flags_from_accumulator();
     state.parity_from_accumulator();
@@ -156,7 +159,28 @@ pub(crate) fn and_value(state: &mut State, value: u8) -> u8 {
 /// Compare the accumulator to the value, updating the flags
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(crate) fn cp_value(state: &mut State, value: u8) -> u8 {
+pub(super) fn cp_value(state: &mut State, value: u8) -> u8 {
     sub_flags(state, state.a.0, value, false);
+    state.xy_from_value(value);
+    4
+}
+
+/// Rotate the accumulator left and copy the bit that wrapped around to the carry flag
+pub(super) fn rlca(state: &mut State) -> u8 {
+    state.a.0 = state.a.0.rotate_left(1);
+    state.cf = state.a.0 & 0x1 != 0;
+    state.nf = false;
+    state.hf = false;
+    state.xy_from_accumulator();
+    4
+}
+
+/// Rotate the accumulator right and copy the bit that wrapped around to the carry flag
+pub(crate) fn rrca(state: &mut State) -> u8 {
+    state.cf = state.a.0 & 0x1 != 0;
+    state.a.0 = state.a.0.rotate_right(1);
+    state.nf = false;
+    state.hf = false;
+    state.xy_from_accumulator();
     4
 }
