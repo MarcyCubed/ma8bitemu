@@ -275,7 +275,7 @@ pub(crate) fn ora_r<S: I8080FamilyState>(
 
 /// Perform a logical OR between the value pointed by HL and the accumulator, updating the flags
 #[inline]
-pub(crate) fn ora_mem(state: &mut State, memory: &impl Memory) -> u8 {
+pub(crate) fn ora_mem(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8 {
     let value = memory.load(state.get_hl());
     or_value(state, value);
     7
@@ -304,7 +304,7 @@ pub(crate) fn xra_r<S: I8080FamilyState>(
 
 /// Perform a logical XOR between the value pointed by HL and the accumulator, updating the flags
 #[inline]
-pub(crate) fn xra_mem(state: &mut State, memory: &impl Memory) -> u8 {
+pub(crate) fn xra_mem(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8 {
     let value = memory.load(state.get_hl());
     xor_value(state, value);
     7

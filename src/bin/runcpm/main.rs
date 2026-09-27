@@ -1,6 +1,5 @@
-//use ma8080emu::emulator::{Emulator, EmulatorState};
-//use
-use ma8bitemu::i8080::{Emulator, I8080FamilyState};
+use ma8bitemu::i8080::I8080FamilyState;
+use ma8bitemu::z80::Emulator;
 use ma8bitemu::{EmulatorCore, ExecEffect, Fetch};
 use std::fs;
 

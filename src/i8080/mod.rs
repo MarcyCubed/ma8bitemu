@@ -6,11 +6,11 @@ pub(crate) mod load;
 pub(crate) mod math;
 pub mod state;
 
-use core::num::Wrapping;
-// Re-export the emulator with a shorter name
 use crate::Fetch;
 use crate::memory::Memory;
+use core::num::Wrapping;
 pub use emulator::Emulator;
+pub use state::State;
 
 /// Abstraction over the state of Intel 8080 processors and its relatives
 pub trait I8080FamilyState {
@@ -200,6 +200,16 @@ pub trait I8080FamilyState {
 
     /// Set the subtraction flag
     fn set_nf(&mut self, flag: bool);
+
+    /// Load the data pointed by HL
+    fn load_hl(&self, memory: &impl Memory) -> u8 {
+        memory.load(self.get_hl())
+    }
+    /// Write the state to the screen.
+    ///
+    /// Also shows the opcode if it's known.
+    #[cfg(feature = "std")]
+    fn dump(&self, opcode: u8);
 }
 
 impl<T: I8080FamilyState> Fetch for T {

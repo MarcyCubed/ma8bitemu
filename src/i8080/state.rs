@@ -40,19 +40,19 @@ pub struct State {
 
 impl State {
     /// Carry flag bit
-    pub const C_FLAG_BIT: u8 = 0;
+    pub const C_FLAG_BIT: u32 = 0;
 
     /// Parity flag bit
-    pub const P_FLAG_BIT: u8 = 2;
+    pub const P_FLAG_BIT: u32 = 2;
 
     /// Zero flag bit
-    pub const Z_FLAG_BIT: u8 = 6;
+    pub const Z_FLAG_BIT: u32 = 6;
 
     /// Sign flag bit
-    pub const S_FLAG_BIT: u8 = 7;
+    pub const S_FLAG_BIT: u32 = 7;
 
     /// Auxiliary carry flag bit
-    pub const A_FLAG_BIT: u8 = 4;
+    pub const A_FLAG_BIT: u32 = 4;
 
     pub fn new() -> Self {
         Self {
@@ -72,28 +72,6 @@ impl State {
             sf: false,
             af: false,
         }
-    }
-
-    /// Write the state to the screen.
-    ///
-    /// Also shows the opcode if it's known.
-    #[cfg(feature = "std")]
-    pub fn dump(&self, opcode: u8) {
-        print!("pc={:04x}h", self.pc);
-        print!(",sp={:04x}h", self.sp);
-        print!(",op={:02x}h", opcode);
-        print!(",a={:02x}h", self.a);
-        print!(",bc={:04x}h", self.get_bc());
-        print!(",de={:04x}h", self.get_de());
-        print!(",hl={:04x}h", self.get_hl());
-        print!(",cf={}", self.cf as u8);
-        print!(",pf={}", self.pf as u8);
-        print!(",af={}", self.af as u8);
-        print!(",zf={}", self.zf as u8);
-        print!(",sf={}", self.sf as u8);
-        print!(",iff={}", self.inte as u8);
-
-        println!();
     }
 }
 
@@ -288,6 +266,28 @@ impl I8080FamilyState for State {
 
     fn set_nf(&mut self, _flag: bool) {
         // Do nothing
+    }
+
+    /// Write the state to the screen.
+    ///
+    /// Also shows the opcode if it's known.
+    #[cfg(feature = "std")]
+    fn dump(&self, opcode: u8) {
+        print!("pc={:04x}h", self.pc);
+        print!(",sp={:04x}h", self.sp);
+        print!(",op={:02x}h", opcode);
+        print!(",a={:02x}h", self.a);
+        print!(",bc={:04x}h", self.get_bc());
+        print!(",de={:04x}h", self.get_de());
+        print!(",hl={:04x}h", self.get_hl());
+        print!(",cf={}", self.cf as u8);
+        print!(",pf={}", self.pf as u8);
+        print!(",af={}", self.af as u8);
+        print!(",zf={}", self.zf as u8);
+        print!(",sf={}", self.sf as u8);
+        print!(",iff={}", self.inte as u8);
+
+        println!();
     }
 }
 

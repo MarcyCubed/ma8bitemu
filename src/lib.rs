@@ -2,6 +2,7 @@
 
 pub mod i8080;
 pub mod memory;
+pub mod z80;
 
 use crate::memory::Memory;
 
