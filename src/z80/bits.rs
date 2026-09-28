@@ -1,4 +1,4 @@
-//! Bit instructions
+//! Bit instructions (prefix CB)
 
 use crate::i8080::I8080FamilyState;
 use crate::memory::Memory;
@@ -167,77 +167,6 @@ macro_rules! set_mem {
         15
     }};
 }
-
-/*
-/// Common core for shifts
-///
-/// `shift_func` is the function that actually performs the shift, `lost_bit` is the number of the
-/// bit that falls out of the value
-fn shift_common(
-    state: &mut State,
-    reg: Register,
-    shift_func: fn(u8) -> u8,
-    lost_bit: u32,
-    cycles: u32,
-) -> ExecResult {
-    let value = state.get_register_8(reg);
-    let carry = Flags::C.set_if(value & (1 << lost_bit) != 0);
-    let value = shift_func(value);
-    state.set_register_8(reg, value);
-    state.update_flags(Flags::from_value(value) | Flags::parity(value) | carry);
-    ExecResult::Done(cycles)
-}
-
-/// Arithmetic left shift
-pub(crate) fn sla_r(state: &mut State, reg: Register, cycles: u32) -> ExecResult {
-    shift_common(state, reg, |n| n << 1, 7, cycles)
-}
-
-/// Arithmetic right shift
-pub(crate) fn sra_r(state: &mut State, reg: Register, cycles: u32) -> ExecResult {
-    shift_common(state, reg, |n| (n as i8 >> 1) as u8, 0, cycles)
-}
-
-/// Logical left shift
-///
-/// This is an undocumented instruction
-pub(crate) fn sll_r(state: &mut State, reg: Register, cycles: u32) -> ExecResult {
-    shift_common(state, reg, |n| (n << 1) | 1, 7, cycles)
-}
-
-/// Logical right shift
-pub(crate) fn srl_r(state: &mut State, reg: Register, cycles: u32) -> ExecResult {
-    shift_common(state, reg, |n| n >> 1, 0, cycles)
-}
-
-/// Check if a bit is reset
-///
-/// If the bit is `0`, sets the `Z` flag
-pub(crate) fn bit_r(state: &mut State, reg: Register, bit_number: u32, cycles: u32) -> ExecResult {
-    let value = state.get_register_8(reg);
-    let bit = value & (1 << bit_number);
-    let flags = state.get_flags().select(Flags::C)
-        | Flags::from_value(bit)
-        | Flags::xy(value)
-        | Flags::parity(bit)
-        | Flags::H;
-    state.update_flags(flags);
-    ExecResult::Done(cycles)
-}
-
-/// Reset a bit
-pub(crate) fn res_r(state: &mut State, reg: Register, bit_number: u32, cycles: u32) -> ExecResult {
-    let value = state.get_register_8(reg);
-    state.set_register_8(reg, value & !(1 << bit_number));
-    ExecResult::Done(cycles)
-}
-
-/// Set a bit
-pub(crate) fn set_r(state: &mut State, reg: Register, bit_number: u32, cycles: u32) -> ExecResult {
-    let value = state.get_register_8(reg);
-    state.set_register_8(reg, value | (1 << bit_number));
-    ExecResult::Done(cycles)
-} */
 
 /// Runs a rotate or shift instruction on a register
 macro_rules! rot_shift_r {
