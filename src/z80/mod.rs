@@ -1,5 +1,6 @@
 //! Zilog Z80 emulator
 
+mod bits;
 pub mod emulator;
 pub mod state;
 mod z8080;

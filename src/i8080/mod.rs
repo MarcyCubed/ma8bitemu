@@ -205,6 +205,12 @@ pub trait I8080FamilyState {
     fn load_hl(&self, memory: &impl Memory) -> u8 {
         memory.load(self.get_hl())
     }
+
+    /// Load the data pointed by HL
+    fn store_hl(&self, memory: &mut impl Memory, data: u8) {
+        memory.store(self.get_hl(), data)
+    }
+
     /// Write the state to the screen.
     ///
     /// Also shows the opcode if it's known.

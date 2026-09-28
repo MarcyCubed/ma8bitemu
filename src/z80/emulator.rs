@@ -3,7 +3,7 @@
 use crate::i8080::I8080FamilyState;
 use crate::memory::Memory;
 use crate::z80::state::State;
-use crate::z80::z8080;
+use crate::z80::{bits, z8080};
 use crate::{ExecEffect, Fetch, i8080};
 use core::mem;
 
@@ -500,7 +500,10 @@ impl crate::EmulatorCore for Emulator {
                     mem::swap(&mut self.state.l, &mut self.state.l_alt);
                     4
                 }
-                0xcb => todo!("Bit instructions"),
+                0xcb => {
+                    let opcode = self.fetch_byte(memory);
+                    bits::run_opcode(&mut self.state, opcode, memory)
+                }
                 0xdd => todo!("IX instructions"),
                 0xed => todo!("Misc instructions"),
                 0xfd => todo!("IY instructions"),
