@@ -2,6 +2,7 @@
 
 mod bits;
 pub mod emulator;
+mod misc;
 pub mod state;
 mod z8080;
 

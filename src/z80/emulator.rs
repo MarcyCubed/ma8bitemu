@@ -3,7 +3,7 @@
 use crate::i8080::I8080FamilyState;
 use crate::memory::Memory;
 use crate::z80::state::State;
-use crate::z80::{bits, z8080};
+use crate::z80::{bits, misc, z8080};
 use crate::{ExecEffect, Fetch, i8080};
 use core::mem;
 
@@ -114,7 +114,7 @@ impl crate::EmulatorCore for Emulator {
                 }
                 0x02 => i8080::load::stax(&mut self.state, memory, |s| s.get_bc()), // ld (bc), a
                 0x12 => i8080::load::stax(&mut self.state, memory, |s| s.get_de()), // ld (de), a
-                0x22 => i8080::load::shld(&mut self.state, memory),                 // ld (nn), hl
+                0x22 => i8080::load::shld_rr(&mut self.state, memory, State::get_hl), // ld (nn), hl
                 0x32 => i8080::load::sta(&mut self.state, memory),                  // ld (nn), a
                 0x03 => i8080::math::inx(&mut self.state, State::get_bc, State::set_bc), // inc bc
                 0x13 => i8080::math::inx(&mut self.state, State::get_de, State::set_de), // inc de
@@ -155,30 +155,30 @@ impl crate::EmulatorCore for Emulator {
                 // add hl, bc
                 0x09 => {
                     let value = self.state.get_bc();
-                    z8080::add_hl_value(&mut self.state, value);
+                    z8080::add_hl_value(&mut self.state, value, false);
                     7
                 }
                 // add hl, de
                 0x19 => {
                     let value = self.state.get_de();
-                    z8080::add_hl_value(&mut self.state, value);
+                    z8080::add_hl_value(&mut self.state, value, false);
                     7
                 }
                 // add hl, hl
                 0x29 => {
                     let value = self.state.get_hl();
-                    z8080::add_hl_value(&mut self.state, value);
+                    z8080::add_hl_value(&mut self.state, value, false);
                     7
                 }
                 // add hl, sp
                 0x39 => {
                     let value = self.state.sp.0;
-                    z8080::add_hl_value(&mut self.state, value);
+                    z8080::add_hl_value(&mut self.state, value, false);
                     7
                 }
                 0x0a => i8080::load::ldax(&mut self.state, memory, State::get_bc), // ld a, (bc)
                 0x1a => i8080::load::ldax(&mut self.state, memory, State::get_de), // ld a, (de)
-                0x2a => i8080::load::lhld(&mut self.state, memory),                // ld hl, (nn)
+                0x2a => i8080::load::lhld_rr(&mut self.state, memory, State::set_hl), // ld hl, (nn)
                 0x3a => i8080::load::lda(&mut self.state, memory),                 // ld a, (nn)
                 0x0b => i8080::math::dcx(&mut self.state, State::get_bc, State::set_bc), // dec bc
                 0x1b => i8080::math::dcx(&mut self.state, State::get_de, State::set_de), // dec de
@@ -371,10 +371,12 @@ impl crate::EmulatorCore for Emulator {
                 // OUT d8
                 0xd3 => {
                     let port = self.fetch_byte(memory);
+                    self.state.mem_ptr.0 =
+                        u16::from_le_bytes([port.wrapping_add(1), self.state.a.0]);
                     break 'main (
                         11,
                         ExecEffect::Out {
-                            port,
+                            port: u16::from_le_bytes([port, self.state.a.0]),
                             data: self.state.a.0,
                         },
                     );
@@ -452,9 +454,13 @@ impl crate::EmulatorCore for Emulator {
                 0xff => i8080::jump::rst(&mut self.state, memory, 0x38),
                 0xe9 => i8080::jump::jp_hl(&mut self.state, 4), // PCHL
                 0xf9 => i8080::load::sphl(&mut self.state, 6),  // spHL
-                // IN d8
+                // in a (n)
                 0xdb => {
-                    let port = self.fetch_byte(memory);
+                    let port = self.fetch_byte(memory) as u16;
+                    self.state.in_opcode = opcode;
+                    self.state.mem_ptr.0 = self.state.a.0 as u16;
+                    self.state.mem_ptr += port;
+                    self.state.mem_ptr += 1;
                     break 'main (11, ExecEffect::In { port });
                 }
                 0xeb => i8080::load::xchg(&mut self.state), // XCHG
@@ -500,17 +506,49 @@ impl crate::EmulatorCore for Emulator {
                     mem::swap(&mut self.state.l, &mut self.state.l_alt);
                     4
                 }
+                // CB prefix Instructions
                 0xcb => {
                     let opcode = self.fetch_byte(memory);
                     bits::run_opcode(&mut self.state, opcode, memory)
                 }
                 0xdd => todo!("IX instructions"),
-                0xed => todo!("Misc instructions"),
+                // ED prefix Instructions
+                0xed => {
+                    let opcode = self.fetch_byte(memory);
+                    break 'main misc::run_opcode(&mut self.state, opcode, memory);
+                }
                 0xfd => todo!("IY instructions"),
             };
             (clock_cycles, ExecEffect::Normal)
         };
         self.last_effect = result.1;
         result
+    }
+}
+
+impl Emulator {
+    /// Give the emulator an input requested by the IN instruction
+    pub fn input(&mut self, value: u8) {
+        // If it's 'IN A, (N)'
+        if self.state.in_opcode == 0xdb {
+            self.state.a.0 = value;
+        } else {
+            // Z80-specific 'in' instructions
+            self.state.nf = false;
+            self.state.parity_flag(value);
+            self.state.hf = false;
+            self.state.flags_from_value(value);
+            // Put the value in a register
+            match self.state.in_opcode {
+                0x40 => self.state.b.0 = value,
+                0x48 => self.state.c.0 = value,
+                0x50 => self.state.d.0 = value,
+                0x58 => self.state.e.0 = value,
+                0x60 => self.state.h.0 = value,
+                0x68 => self.state.l.0 = value,
+                0x78 => self.state.a.0 = value,
+                _ => unreachable!("The opcode isn't from an IN instruction"),
+            }
+        }
     }
 }

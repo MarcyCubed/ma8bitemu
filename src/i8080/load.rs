@@ -29,13 +29,18 @@ pub(crate) fn stax<S: I8080FamilyState, M: Memory>(
     7
 }
 
-/// Store the value of HL in the immediate memory address
-pub(crate) fn shld(state: &mut impl I8080FamilyState, memory: &mut impl Memory) -> u8 {
+/// Store the value of a 16-bit register in the immediate memory address
+pub(crate) fn shld_rr<S: I8080FamilyState>(
+    state: &mut S,
+    memory: &mut impl Memory,
+    register: impl Fn(&S) -> u16,
+) -> u8 {
     let address_0 = state.fetch_word(memory);
     let address_1 = address_0.wrapping_add(1);
     state.set_memptr(address_1);
-    memory.store(address_0, state.get_l().0);
-    memory.store(address_1, state.get_h().0);
+    let values = register(state).to_le_bytes();
+    memory.store(address_0, values[0]);
+    memory.store(address_1, values[1]);
     16
 }
 
@@ -82,13 +87,17 @@ pub(crate) fn ldax<S: I8080FamilyState, M: Memory>(
     7
 }
 
-/// Load the value pointed by the immediate address into HL
-pub(crate) fn lhld(state: &mut impl I8080FamilyState, memory: &mut impl Memory) -> u8 {
+/// Load the value pointed by the immediate address into the 16-bit register
+pub(crate) fn lhld_rr<S: I8080FamilyState>(
+    state: &mut S,
+    memory: &mut impl Memory,
+    setter: impl Fn(&mut S, u16),
+) -> u8 {
     let address_0 = state.fetch_word(memory);
     let address_1 = address_0.wrapping_add(1);
     state.set_memptr(address_1);
-    state.get_l_mut().0 = memory.load(address_0);
-    state.get_h_mut().0 = memory.load(address_1);
+    let value = u16::from_le_bytes([memory.load(address_0), memory.load(address_1)]);
+    setter(state, value);
     16
 }
 

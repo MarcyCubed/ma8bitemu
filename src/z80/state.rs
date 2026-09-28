@@ -73,6 +73,8 @@ pub struct State {
     pub yf: bool,
     /// Undocumented register `MEMPTR`
     pub mem_ptr: Wrapping<u16>,
+    /// Opcode of the `in` instruction
+    pub(crate) in_opcode: u8,
 }
 
 /// How the processor handles interruptions
@@ -152,6 +154,7 @@ impl State {
             xf: true,
             yf: true,
             mem_ptr: Default::default(),
+            in_opcode: 0,
         }
     }
 

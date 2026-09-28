@@ -102,7 +102,7 @@ pub enum ExecEffect {
     /// Disable interrupts for the next instruction
     InterruptDelay,
     /// The emulator wants to read the given port
-    In { port: u8 },
+    In { port: u16 },
     /// The emulator wants to write data to the given port
-    Out { port: u8, data: u8 },
+    Out { port: u16, data: u8 },
 }

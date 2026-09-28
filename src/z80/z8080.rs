@@ -8,7 +8,7 @@ use core::num::Wrapping;
 
 /// Do `a - b - borrow`, update the flags in the state and return the result
 #[inline]
-fn sub_flags(state: &mut State, a: u8, b: u8, borrow: bool) -> u8 {
+pub(super) fn sub_flags(state: &mut State, a: u8, b: u8, borrow: bool) -> u8 {
     let a = a as u16;
     let b = b as u16;
     let mut c = Wrapping(a as u16);
@@ -101,13 +101,14 @@ pub(super) fn scf(state: &mut State) -> u8 {
     4
 }
 
-/// Add a 16-bit value to HL and set the flags.
-pub(super) fn add_hl_value(state: &mut State, value: u16) {
+/// Add a 16-bit value and a carry to HL and set the flags.
+pub(super) fn add_hl_value(state: &mut State, value: u16, carry: bool) {
     state.mem_ptr.0 = state.get_hl();
     state.mem_ptr += 1;
-    let (result, carry) = state.get_hl().overflowing_add(value);
+    let (result, carry_0) = state.get_hl().overflowing_add(value);
+    let (result, carry_1) = result.overflowing_add(carry as u16);
     state.nf = false;
-    state.cf = carry;
+    state.cf = carry_0 || carry_1;
     let [result_low, result_high] = result.to_le_bytes();
     state.hf = check_carry(
         State::H_FLAG_BIT,

@@ -69,7 +69,7 @@ impl crate::EmulatorCore for Emulator {
                 // STAX D
                 0x12 => load::stax(&mut self.state, memory, |s| s.get_de()),
                 // SHLD a16
-                0x22 => load::shld(&mut self.state, memory),
+                0x22 => load::shld_rr(&mut self.state, memory, State::get_hl),
                 // STA a16
                 0x32 => load::sta(&mut self.state, memory),
                 // INX B
@@ -149,7 +149,7 @@ impl crate::EmulatorCore for Emulator {
                 // LDAX D
                 0x1a => load::ldax(&mut self.state, memory, State::get_de),
                 // LHLD a16
-                0x2a => load::lhld(&mut self.state, memory),
+                0x2a => load::lhld_rr(&mut self.state, memory, State::set_hl),
                 // LDA a16
                 0x3a => load::lda(&mut self.state, memory),
                 // DCX B
@@ -340,7 +340,7 @@ impl crate::EmulatorCore for Emulator {
                 0xc3 | 0xcb => jump::jp_cond_nn(&mut self.state, memory, |_| true), // JMP
                 // OUT d8
                 0xd3 => {
-                    let port = self.fetch_byte(memory);
+                    let port = self.fetch_byte(memory) as u16;
                     break 'main (
                         10,
                         ExecEffect::Out {
@@ -394,7 +394,7 @@ impl crate::EmulatorCore for Emulator {
                 0xf9 => load::sphl(&mut self.state, 5),  // SPHL
                 // IN d8
                 0xdb => {
-                    let port = self.fetch_byte(memory);
+                    let port = self.fetch_byte(memory) as u16;
                     break 'main (10, ExecEffect::In { port });
                 }
                 0xeb => load::xchg(&mut self.state), // XCHG
