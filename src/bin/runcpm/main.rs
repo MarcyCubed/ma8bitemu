@@ -1,5 +1,5 @@
-use ma8bitemu::i8080::I8080FamilyState;
-use ma8bitemu::z80::Emulator;
+use ma8bitemu::i8080::Emulator;
+use ma8bitemu::i8080::I8080FamilyEmulator;
 use ma8bitemu::{EmulatorCore, ExecEffect, Fetch};
 use std::fs;
 
@@ -43,20 +43,20 @@ impl CpmRunner {
             emulator: Emulator::new(),
         };
         // Point PC to the start of the program
-        runner.emulator.state.pc.0 = 0x100;
+        runner.emulator.pc.0 = 0x100;
         runner
     }
 
     /// Handle CP/M BDOS calls 2 and 9
     fn bdos_call(&self) {
-        match self.emulator.state.c.0 {
+        match self.emulator.c.0 {
             2 => {
                 // Function 2: Print s character to the screen
-                print!("{}", self.emulator.state.e.0 as char);
+                print!("{}", self.emulator.e.0 as char);
             }
             9 => {
                 // Function 9: Write a $ terminated string to the screen
-                let mut addr = self.emulator.state.get_de() as usize;
+                let mut addr = self.emulator.get_de() as usize;
                 while self.memory[addr] != '$' as u8 {
                     print!("{}", self.memory[addr] as char);
                     addr += 1;
@@ -74,7 +74,7 @@ impl CpmRunner {
             if self.instruction_counter == MAX_PRINT {
                 return;
             } else if self.instruction_counter >= MIN_PRINT {
-                self.emulator.state.dump(opcode);
+                self.emulator.dump(opcode);
             }
             let (cycles, result) = self.emulator.run_opcode(opcode, &mut self.memory);
             self.cycles += cycles as u64;

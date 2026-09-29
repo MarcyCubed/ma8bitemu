@@ -4,16 +4,15 @@ pub mod emulator;
 pub(crate) mod jump;
 pub(crate) mod load;
 pub(crate) mod math;
-pub mod state;
 
-use crate::Fetch;
 use crate::memory::Memory;
+use crate::{EmulatorCore, Fetch};
 use core::num::Wrapping;
 pub use emulator::Emulator;
-pub use state::State;
 
-/// Abstraction over the state of Intel 8080 processors and its relatives
-pub trait I8080FamilyState {
+/// Abstraction over the emulator of Intel 8080 processors and its relatives, so we can reuse
+/// instructions
+pub trait I8080FamilyEmulator: EmulatorCore {
     /// Get the value of the register A
     fn get_a(&self) -> Wrapping<u8>;
 
@@ -219,9 +218,15 @@ pub trait I8080FamilyState {
 
     /// Sets the value of the internal register memptr
     fn set_memptr(&mut self, address: u16);
+
+    /// Give the emulator an input requested by the IN instruction
+    fn input(&mut self, value: u8);
+
+    /// Cause an interrupt
+    fn interrupt(&mut self, vector: u8);
 }
 
-impl<T: I8080FamilyState> Fetch for T {
+impl<T: I8080FamilyEmulator> Fetch for T {
     #[inline]
     fn fetch_byte(&mut self, memory: &impl Memory) -> u8 {
         let address = self.get_pc().0;

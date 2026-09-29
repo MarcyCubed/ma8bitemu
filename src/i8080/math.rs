@@ -1,133 +1,134 @@
 //! Math instructions
 
-use crate::Fetch;
-use crate::i8080::I8080FamilyState;
-use crate::i8080::state::State;
+use crate::i8080::{Emulator, I8080FamilyEmulator};
 use crate::memory::Memory;
 use core::num::Wrapping;
 
 /// Increment a 16-bit register
-pub(crate) fn inx<S: I8080FamilyState>(
-    state: &mut S,
-    getter: fn(&S) -> u16,
-    setter: fn(&mut S, u16),
+pub(crate) fn inx<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    getter: fn(&E) -> u16,
+    setter: fn(&mut E, u16),
 ) -> u8 {
-    let inc = getter(state).wrapping_add(1);
-    setter(state, inc);
+    let inc = getter(emulator).wrapping_add(1);
+    setter(emulator, inc);
     5
 }
 
 /// Decrement a 16-bit register
-pub(crate) fn dcx<S: I8080FamilyState>(
-    state: &mut S,
-    getter: fn(&S) -> u16,
-    setter: fn(&mut S, u16),
+pub(crate) fn dcx<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    getter: fn(&E) -> u16,
+    setter: fn(&mut E, u16),
 ) -> u8 {
-    let inc = getter(state).wrapping_sub(1);
-    setter(state, inc);
+    let inc = getter(emulator).wrapping_sub(1);
+    setter(emulator, inc);
     5
 }
 
 /// Increment a register and set the appropriate flags
 #[inline]
-pub(crate) fn inc<S: I8080FamilyState>(
-    state: &mut S,
-    get_register: impl Fn(&mut S) -> &mut Wrapping<u8>,
+pub(crate) fn inc<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    get_register: impl Fn(&mut E) -> &mut Wrapping<u8>,
 ) -> u8 {
-    let old_value = *get_register(state);
-    let new_value = inc_value(state, old_value);
-    *get_register(state) = new_value;
+    let old_value = *get_register(emulator);
+    let new_value = inc_value(emulator, old_value);
+    *get_register(emulator) = new_value;
     5
 }
 
-/// Increment a value and set the appropriate flags on the state.
+/// Increment a value and set the appropriate flags.
 ///
 /// Return the incremented value.
 #[inline]
-fn inc_value(state: &mut impl I8080FamilyState, value: Wrapping<u8>) -> Wrapping<u8> {
+fn inc_value(emulator: &mut impl I8080FamilyEmulator, value: Wrapping<u8>) -> Wrapping<u8> {
     let mut new_value = value;
     new_value += 1;
-    state.flags_from_value(new_value.0);
-    state.overflow_flag(new_value.0 == 1 << 7);
-    state.set_hf(0x10 & (value.0 ^ new_value.0) != 0);
-    state.set_nf(false);
+    emulator.flags_from_value(new_value.0);
+    emulator.overflow_flag(new_value.0 == 1 << 7);
+    emulator.set_hf(0x10 & (value.0 ^ new_value.0) != 0);
+    emulator.set_nf(false);
     new_value
 }
 
 /// Increments the value in memory pointed by HL
-pub(crate) fn inc_mem<S: I8080FamilyState>(state: &mut S, memory: &mut impl Memory) -> u8 {
-    let address = state.get_hl();
-    let value = inc_value(state, Wrapping(memory.load(address)));
+pub(crate) fn inc_mem<E: I8080FamilyEmulator>(emulator: &mut E, memory: &mut impl Memory) -> u8 {
+    let address = emulator.get_hl();
+    let value = inc_value(emulator, Wrapping(memory.load(address)));
     memory.store(address, value.0);
     10
 }
 
 /// Decrement a register and set the appropriate flags
 #[inline]
-pub(crate) fn dec(state: &mut State, get_register: impl Fn(&mut State) -> &mut Wrapping<u8>) -> u8 {
-    let old_value = *get_register(state);
-    let new_value = dec_value(state, old_value);
-    *get_register(state) = new_value;
+pub(crate) fn dec(
+    emulator: &mut Emulator,
+    get_register: impl Fn(&mut Emulator) -> &mut Wrapping<u8>,
+) -> u8 {
+    let old_value = *get_register(emulator);
+    let new_value = dec_value(emulator, old_value);
+    *get_register(emulator) = new_value;
     5
 }
 
-/// Decrement a value and set the appropriate flags on the state.
+/// Decrement a value and set the appropriate flags.
 ///
 /// Return the decremented value.
 #[inline]
-fn dec_value(state: &mut State, value: Wrapping<u8>) -> Wrapping<u8> {
+fn dec_value(emulator: &mut Emulator, value: Wrapping<u8>) -> Wrapping<u8> {
     let mut new_value = value;
     new_value -= 1;
-    state.flags_from_value(new_value.0);
-    state.af = new_value.0 & 0xf != 0xf;
+    emulator.flags_from_value(new_value.0);
+    emulator.af = new_value.0 & 0xf != 0xf;
     new_value
 }
 
 /// Decrements the value in memory pointed by HL
-pub(crate) fn dec_mem(state: &mut State, memory: &mut impl Memory) -> u8 {
-    let address = state.get_hl();
-    let value = dec_value(state, Wrapping(memory.load(address)));
+pub(crate) fn dec_mem(emulator: &mut Emulator, memory: &mut impl Memory) -> u8 {
+    let address = emulator.get_hl();
+    let value = dec_value(emulator, Wrapping(memory.load(address)));
     memory.store(address, value.0);
     10
 }
 
 /// Rotate the accumulator left and copy the original most significant bit to the carry flag
-pub(super) fn rlc(state: &mut State) -> u8 {
-    state.a.0 = state.a.0.rotate_left(1);
-    state.cf = state.a.0 & 0x1 != 0;
+pub(super) fn rlc(emulator: &mut Emulator) -> u8 {
+    emulator.a.0 = emulator.a.0.rotate_left(1);
+    emulator.cf = emulator.a.0 & 0x1 != 0;
     4
 }
 
 /// Rotate the 9-bit value composed by the C flag and the accumulator to the left
-pub(crate) fn ral(state: &mut impl I8080FamilyState) -> u8 {
-    let new_c_flag = state.get_a().0 & (1 << 7) != 0;
-    let new_a = state.get_a().0 << 1 | state.get_cf() as u8;
-    *state.get_a_mut() = Wrapping(new_a);
-    state.set_cf(new_c_flag);
+pub(crate) fn ral(emulator: &mut impl I8080FamilyEmulator) -> u8 {
+    let new_c_flag = emulator.get_a().0 & (1 << 7) != 0;
+    let new_a = emulator.get_a().0 << 1 | emulator.get_cf() as u8;
+    *emulator.get_a_mut() = Wrapping(new_a);
+    emulator.set_cf(new_c_flag);
     4
 }
 
 /// Rotate the accumulator right and copy the original least significant bit to the carry flag
-pub(super) fn rrc(state: &mut State) -> u8 {
-    state.cf = state.get_a().0 & 0x1 != 0;
-    state.a.0 = state.a.0.rotate_right(1);
+pub(super) fn rrc(emulator: &mut Emulator) -> u8 {
+    emulator.cf = emulator.get_a().0 & 0x1 != 0;
+    emulator.a.0 = emulator.a.0.rotate_right(1);
     4
 }
 
 /// Rotate the 9-bit value composed by the C flag and the accumulator to the right
-pub(crate) fn rar(state: &mut impl I8080FamilyState) -> u8 {
-    let new_c_flag = state.get_a().0 & 0x1 != 0;
-    state.get_a_mut().0 = (state.get_a().0 >> 1) | ((state.get_cf() as u8) << 7);
-    state.set_cf(new_c_flag);
+pub(crate) fn rar(emulator: &mut impl I8080FamilyEmulator) -> u8 {
+    let new_c_flag = emulator.get_a().0 & 0x1 != 0;
+    emulator.get_a_mut().0 = (emulator.get_a().0 >> 1) | ((emulator.get_cf() as u8) << 7);
+    emulator.set_cf(new_c_flag);
     4
 }
 
 /// Add a value to HL, updating the carry flag
 #[inline]
-pub(crate) fn dad(state: &mut State, register: fn(&State) -> u16) -> u8 {
-    let (hl, carry) = state.get_hl().overflowing_add(register(state));
-    state.set_hl(hl);
-    state.cf = carry;
+pub(crate) fn dad(emulator: &mut Emulator, register: fn(&Emulator) -> u16) -> u8 {
+    let (hl, carry) = emulator.get_hl().overflowing_add(register(emulator));
+    emulator.set_hl(hl);
+    emulator.cf = carry;
     10
 }
 
@@ -139,241 +140,241 @@ pub(crate) fn check_carry(bit: u32, a: u16, b: u16, sum: u16) -> bool {
 
 /// Add a value and a carry to A, updating the flags
 #[inline]
-pub(crate) fn add_value(state: &mut impl I8080FamilyState, value: u8, carry: bool) {
-    let a = state.get_a().0 as u16;
+pub(crate) fn add_value(emulator: &mut impl I8080FamilyEmulator, value: u8, carry: bool) {
+    let a = emulator.get_a().0 as u16;
     let value = value as u16;
     let mut sum = Wrapping(a);
     sum += value;
     sum += carry as u16;
-    state.set_nf(false);
-    state.set_cf(sum.0 & (1 << 8) != 0);
-    state.set_hf(check_carry(4, a, value, sum.0));
-    state.overflow_flag(check_carry(7, a, value, sum.0) != state.get_cf());
-    state.get_a_mut().0 = sum.0 as u8;
-    state.flags_from_accumulator();
+    emulator.set_nf(false);
+    emulator.set_cf(sum.0 & (1 << 8) != 0);
+    emulator.set_hf(check_carry(4, a, value, sum.0));
+    emulator.overflow_flag(check_carry(7, a, value, sum.0) != emulator.get_cf());
+    emulator.get_a_mut().0 = sum.0 as u8;
+    emulator.flags_from_accumulator();
 }
 
 /// Add the value of a register to A, updating the flags
 #[inline]
-pub(crate) fn add_r<S: I8080FamilyState>(
-    state: &mut S,
-    get_register: fn(&S) -> Wrapping<u8>,
+pub(crate) fn add_r<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    get_register: fn(&E) -> Wrapping<u8>,
 ) -> u8 {
-    add_value(state, get_register(state).0, false);
+    add_value(emulator, get_register(emulator).0, false);
     4
 }
 
 /// Add the value pointed by HL to A, updating the flags
 #[inline]
-pub(crate) fn add_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) -> u8 {
-    add_value(state, memory.load(state.get_hl()), false);
+pub(crate) fn add_mem<E: I8080FamilyEmulator>(emulator: &mut E, memory: &impl Memory) -> u8 {
+    add_value(emulator, memory.load(emulator.get_hl()), false);
     7
 }
 
 /// Add the value of a register and the carry flag to A, updating the flags
 #[inline]
-pub(crate) fn adc_r<S: I8080FamilyState>(
-    state: &mut S,
-    get_register: fn(&S) -> Wrapping<u8>,
+pub(crate) fn adc_r<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    get_register: fn(&E) -> Wrapping<u8>,
 ) -> u8 {
-    add_value(state, get_register(state).0, state.get_cf());
+    add_value(emulator, get_register(emulator).0, emulator.get_cf());
     4
 }
 
 /// Add the value pointed by HL and the carry flag to A, updating the flags
 #[inline]
-pub(crate) fn adc_mem<S: I8080FamilyState>(state: &mut S, memory: &impl Memory) -> u8 {
-    let carry = state.get_cf();
-    add_value(state, memory.load(state.get_hl()), carry);
+pub(crate) fn adc_mem<E: I8080FamilyEmulator>(emulator: &mut E, memory: &impl Memory) -> u8 {
+    let carry = emulator.get_cf();
+    add_value(emulator, memory.load(emulator.get_hl()), carry);
     7
 }
 
 /// Subtract a value and a borrow from A, updating the flags
 #[inline]
-pub(crate) fn sub_value(state: &mut State, value: u8, carry: bool) {
-    add_value(state, !value, !carry);
-    state.cf = !state.cf;
+pub(crate) fn sub_value(emulator: &mut Emulator, value: u8, carry: bool) {
+    add_value(emulator, !value, !carry);
+    emulator.cf = !emulator.cf;
 }
 
 /// Subtract the value of a register from A, updating the flags
 #[inline]
-pub(crate) fn sub_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
-    let value = get_register(state).0;
-    sub_value(state, value, false);
+pub(crate) fn sub_r(emulator: &mut Emulator, get_register: fn(&Emulator) -> Wrapping<u8>) -> u8 {
+    let value = get_register(emulator).0;
+    sub_value(emulator, value, false);
     4
 }
 
 /// Subtract the value pointed by HL from A, updating the flags
 #[inline]
-pub(crate) fn sub_mem(state: &mut State, memory: &impl Memory) -> u8 {
-    sub_value(state, memory.load(state.get_hl()), false);
+pub(crate) fn sub_mem(emulator: &mut Emulator, memory: &impl Memory) -> u8 {
+    sub_value(emulator, memory.load(emulator.get_hl()), false);
     7
 }
 
 /// Subtract the value of a register and the carry flag from A, updating the flags
 #[inline]
-pub(crate) fn sbb_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
-    let value = get_register(state).0;
-    let carry = state.cf;
-    sub_value(state, value, carry);
+pub(crate) fn sbb_r(emulator: &mut Emulator, get_register: fn(&Emulator) -> Wrapping<u8>) -> u8 {
+    let value = get_register(emulator).0;
+    let carry = emulator.cf;
+    sub_value(emulator, value, carry);
     4
 }
 
 /// Subtract the value pointed by HL and the carry flag from A, updating the flags
 #[inline]
-pub(crate) fn sbb_mem(state: &mut State, memory: &impl Memory) -> u8 {
-    sub_value(state, memory.load(state.get_hl()), state.cf);
+pub(crate) fn sbb_mem(emulator: &mut Emulator, memory: &impl Memory) -> u8 {
+    sub_value(emulator, memory.load(emulator.get_hl()), emulator.cf);
     7
 }
 
 /// Perform a logical AND between the value and the accumulator, updating the flags
 #[inline]
-pub(crate) fn and_value(state: &mut State, value: u8) {
-    let a = state.a.0;
-    state.a.0 &= value;
-    state.flags_from_accumulator();
-    state.cf = false;
+pub(crate) fn and_value(emulator: &mut Emulator, value: u8) {
+    let a = emulator.a.0;
+    emulator.a.0 &= value;
+    emulator.flags_from_accumulator();
+    emulator.cf = false;
     // What were the Intel engineers smoking?!
-    state.af = (a | value) & 0b1000 != 0;
+    emulator.af = (a | value) & 0b1000 != 0;
 }
 
 /// Perform a logical AND between the register and the accumulator, updating the flags
 #[inline]
-pub(crate) fn ana_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
-    and_value(state, get_register(state).0);
+pub(crate) fn ana_r(emulator: &mut Emulator, get_register: fn(&Emulator) -> Wrapping<u8>) -> u8 {
+    and_value(emulator, get_register(emulator).0);
     4
 }
 
 /// Perform a logical AND between the value pointed by HL and the accumulator, updating the flags
 #[inline]
-pub(crate) fn ana_mem(state: &mut State, memory: &impl Memory) -> u8 {
-    let value = memory.load(state.get_hl());
-    and_value(state, value);
+pub(crate) fn ana_mem(emulator: &mut Emulator, memory: &impl Memory) -> u8 {
+    let value = memory.load(emulator.get_hl());
+    and_value(emulator, value);
     7
 }
 
 /// Perform a logical OR between the value and the accumulator, updating the flags
 #[inline]
-pub(crate) fn or_value(state: &mut impl I8080FamilyState, value: u8) {
-    state.get_a_mut().0 |= value;
-    state.flags_from_accumulator();
-    state.parity_from_accumulator();
-    state.set_cf(false);
-    state.set_hf(false);
-    state.set_nf(false);
+pub(crate) fn or_value(emulator: &mut impl I8080FamilyEmulator, value: u8) {
+    emulator.get_a_mut().0 |= value;
+    emulator.flags_from_accumulator();
+    emulator.parity_from_accumulator();
+    emulator.set_cf(false);
+    emulator.set_hf(false);
+    emulator.set_nf(false);
 }
 
 /// Perform a logical OR between the register and the accumulator, updating the flags
 #[inline]
-pub(crate) fn ora_r<S: I8080FamilyState>(
-    state: &mut S,
-    get_register: fn(&S) -> Wrapping<u8>,
+pub(crate) fn ora_r<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    get_register: fn(&E) -> Wrapping<u8>,
 ) -> u8 {
-    or_value(state, get_register(state).0);
+    or_value(emulator, get_register(emulator).0);
     4
 }
 
 /// Perform a logical OR between the value pointed by HL and the accumulator, updating the flags
 #[inline]
-pub(crate) fn ora_mem(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8 {
-    let value = memory.load(state.get_hl());
-    or_value(state, value);
+pub(crate) fn ora_mem(emulator: &mut impl I8080FamilyEmulator, memory: &impl Memory) -> u8 {
+    let value = memory.load(emulator.get_hl());
+    or_value(emulator, value);
     7
 }
 
 /// Perform a logical XOR between the value and the accumulator, updating the flags
 #[inline]
-pub(crate) fn xor_value(state: &mut impl I8080FamilyState, value: u8) {
-    state.get_a_mut().0 ^= value;
-    state.flags_from_accumulator();
-    state.parity_from_accumulator();
-    state.set_cf(false);
-    state.set_hf(false);
-    state.set_nf(false);
+pub(crate) fn xor_value(emulator: &mut impl I8080FamilyEmulator, value: u8) {
+    emulator.get_a_mut().0 ^= value;
+    emulator.flags_from_accumulator();
+    emulator.parity_from_accumulator();
+    emulator.set_cf(false);
+    emulator.set_hf(false);
+    emulator.set_nf(false);
 }
 
 /// Perform a logical XOR between the register and the accumulator, updating the flags
 #[inline]
-pub(crate) fn xra_r<S: I8080FamilyState>(
-    state: &mut S,
-    get_register: fn(&S) -> Wrapping<u8>,
+pub(crate) fn xra_r<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    get_register: fn(&E) -> Wrapping<u8>,
 ) -> u8 {
-    xor_value(state, get_register(state).0);
+    xor_value(emulator, get_register(emulator).0);
     4
 }
 
 /// Perform a logical XOR between the value pointed by HL and the accumulator, updating the flags
 #[inline]
-pub(crate) fn xra_mem(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8 {
-    let value = memory.load(state.get_hl());
-    xor_value(state, value);
+pub(crate) fn xra_mem(emulator: &mut impl I8080FamilyEmulator, memory: &impl Memory) -> u8 {
+    let value = memory.load(emulator.get_hl());
+    xor_value(emulator, value);
     7
 }
 
 /// Compare a value with the accumulator
 #[inline]
-pub(crate) fn cmp_value(state: &mut State, value: u8) {
-    let (diff, carry) = state.a.0.overflowing_sub(value);
-    state.cf = carry;
-    state.flags_from_value(diff);
-    state.af = (state.a.0 ^ diff ^ value) & 0x10 == 0;
+pub(crate) fn cmp_value(emulator: &mut Emulator, value: u8) {
+    let (diff, carry) = emulator.a.0.overflowing_sub(value);
+    emulator.cf = carry;
+    emulator.flags_from_value(diff);
+    emulator.af = (emulator.a.0 ^ diff ^ value) & 0x10 == 0;
 }
 
 /// Compare a register with the accumulator
 #[inline]
-pub(crate) fn cmp_r(state: &mut State, get_register: fn(&State) -> Wrapping<u8>) -> u8 {
-    cmp_value(state, get_register(state).0);
+pub(crate) fn cmp_r(emulator: &mut Emulator, get_register: fn(&Emulator) -> Wrapping<u8>) -> u8 {
+    cmp_value(emulator, get_register(emulator).0);
     4
 }
 
 /// Compare a value in memory with the accumulator
 #[inline]
-pub(crate) fn cmp_mem(state: &mut State, memory: &impl Memory) -> u8 {
-    let value = memory.load(state.get_hl());
-    cmp_value(state, value);
+pub(crate) fn cmp_mem(emulator: &mut Emulator, memory: &impl Memory) -> u8 {
+    let value = memory.load(emulator.get_hl());
+    cmp_value(emulator, value);
     7
 }
 
 /// Adjust the accumulator to BCD
-pub(crate) fn daa(state: &mut State) -> u8 {
+pub(crate) fn daa(emulator: &mut Emulator) -> u8 {
     let mut diff = 0;
-    if state.a.0 & 0xf > 0x9 || state.af {
+    if emulator.a.0 & 0xf > 0x9 || emulator.af {
         diff += 0x06
     }
-    if state.a.0 > 0x99 || state.cf {
+    if emulator.a.0 > 0x99 || emulator.cf {
         diff += 0x60;
     }
-    let old_cf = state.cf;
-    add_value(state, diff, false);
-    state.cf |= old_cf;
+    let old_cf = emulator.cf;
+    add_value(emulator, diff, false);
+    emulator.cf |= old_cf;
     4
 }
 
 /// Set the carry flag
-pub(crate) fn stc(state: &mut State) -> u8 {
-    state.cf = true;
+pub(crate) fn stc(emulator: &mut Emulator) -> u8 {
+    emulator.cf = true;
     4
 }
 
 /// Complement of A
-pub(crate) fn cma(state: &mut State) -> u8 {
-    state.a = !state.a;
+pub(crate) fn cma(emulator: &mut Emulator) -> u8 {
+    emulator.a = !emulator.a;
     4
 }
 
 /// Invert the carry flag
-pub(crate) fn cmc(state: &mut State) -> u8 {
-    state.cf = !state.cf;
+pub(crate) fn cmc(emulator: &mut Emulator) -> u8 {
+    emulator.cf = !emulator.cf;
     4
 }
 
 /// Perform an ALU operation on an immediate value
-pub(crate) fn alu_imm<S: I8080FamilyState>(
-    state: &mut S,
-    operation: fn(&mut S, u8),
+pub(crate) fn alu_imm<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    operation: fn(&mut E, u8),
     memory: &impl Memory,
 ) -> u8 {
-    let value = state.fetch_byte(memory);
-    operation(state, value);
+    let value = emulator.fetch_byte(memory);
+    operation(emulator, value);
     7
 }

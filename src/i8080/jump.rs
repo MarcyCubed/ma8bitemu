@@ -1,12 +1,11 @@
 //! Instructions that control the program flow and relatives.
 
-use crate::Fetch;
-use crate::i8080::I8080FamilyState;
+use crate::i8080::I8080FamilyEmulator;
 use crate::memory::Memory;
 
 /// Perform a conditional return.
 #[inline]
-pub(crate) fn ret_cond<S: I8080FamilyState, F: Fn(&S) -> bool>(
+pub(crate) fn ret_cond<S: I8080FamilyEmulator, F: Fn(&S) -> bool>(
     state: &mut S,
     memory: &impl Memory,
     cond: F,
@@ -21,7 +20,7 @@ pub(crate) fn ret_cond<S: I8080FamilyState, F: Fn(&S) -> bool>(
 
 /// Perform a return
 #[inline]
-pub(crate) fn ret(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8 {
+pub(crate) fn ret(state: &mut impl I8080FamilyEmulator, memory: &impl Memory) -> u8 {
     let address = pop_stack(state, memory);
     state.set_pc(address);
     state.set_memptr(address);
@@ -30,7 +29,7 @@ pub(crate) fn ret(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u8
 
 /// Pop a value from the stack
 #[inline]
-pub(crate) fn pop_stack(state: &mut impl I8080FamilyState, memory: &impl Memory) -> u16 {
+pub(crate) fn pop_stack(state: &mut impl I8080FamilyEmulator, memory: &impl Memory) -> u16 {
     let data_0 = memory.load(state.get_sp().0);
     *state.get_sp_mut() += 1;
     let data_1 = memory.load(state.get_sp().0);
@@ -40,7 +39,7 @@ pub(crate) fn pop_stack(state: &mut impl I8080FamilyState, memory: &impl Memory)
 
 /// Pop a value from the stack into a register
 #[inline]
-pub(crate) fn pop<S: I8080FamilyState>(
+pub(crate) fn pop<S: I8080FamilyEmulator>(
     state: &mut S,
     memory: &impl Memory,
     set_register: fn(&mut S, u16),
@@ -52,7 +51,11 @@ pub(crate) fn pop<S: I8080FamilyState>(
 
 /// Push a value to the stack
 #[inline]
-pub(crate) fn push_stack(state: &mut impl I8080FamilyState, memory: &mut impl Memory, value: u16) {
+pub(crate) fn push_stack(
+    state: &mut impl I8080FamilyEmulator,
+    memory: &mut impl Memory,
+    value: u16,
+) {
     let value = value.to_le_bytes();
     *state.get_sp_mut() -= 1;
     memory.store(state.get_sp().0, value[1]);
@@ -62,7 +65,7 @@ pub(crate) fn push_stack(state: &mut impl I8080FamilyState, memory: &mut impl Me
 
 /// Pop a register to the stack
 #[inline]
-pub(crate) fn push<S: I8080FamilyState>(
+pub(crate) fn push<S: I8080FamilyEmulator>(
     state: &mut S,
     memory: &mut impl Memory,
     get_register: fn(&S) -> u16,
@@ -74,7 +77,7 @@ pub(crate) fn push<S: I8080FamilyState>(
 
 /// Call a function in the immediate address if the condition is true.
 #[inline]
-pub(crate) fn call_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
+pub(crate) fn call_cond_nn<S: I8080FamilyEmulator, F: Fn(&S) -> bool>(
     state: &mut S,
     memory: &mut impl Memory,
     cond: F,
@@ -94,7 +97,7 @@ pub(crate) fn call_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
 /// Call a function
 #[inline]
 pub(crate) fn call_address(
-    state: &mut impl I8080FamilyState,
+    state: &mut impl I8080FamilyEmulator,
     memory: &mut impl Memory,
     address: u16,
 ) {
@@ -105,7 +108,7 @@ pub(crate) fn call_address(
 
 /// Perform a conditional return to an immediate address.
 #[inline]
-pub(crate) fn jp_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
+pub(crate) fn jp_cond_nn<S: I8080FamilyEmulator, F: Fn(&S) -> bool>(
     state: &mut S,
     memory: &impl Memory,
     cond: F,
@@ -119,14 +122,18 @@ pub(crate) fn jp_cond_nn<S: I8080FamilyState, F: Fn(&S) -> bool>(
 }
 
 /// RST instruction
-pub(crate) fn rst(state: &mut impl I8080FamilyState, memory: &mut impl Memory, address: u16) -> u8 {
+pub(crate) fn rst(
+    state: &mut impl I8080FamilyEmulator,
+    memory: &mut impl Memory,
+    address: u16,
+) -> u8 {
     state.set_memptr(address);
     call_address(state, memory, address);
     11
 }
 
 /// Jump to the address in HL
-pub(crate) fn jp_hl(state: &mut impl I8080FamilyState, cycles: u8) -> u8 {
+pub(crate) fn jp_hl(state: &mut impl I8080FamilyEmulator, cycles: u8) -> u8 {
     state.get_pc_mut().0 = state.get_hl();
     cycles
 }

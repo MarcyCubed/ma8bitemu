@@ -1,13 +1,12 @@
-use crate::Fetch;
-use crate::i8080::{I8080FamilyState, jump};
+use crate::i8080::{I8080FamilyEmulator, jump};
 use crate::memory::Memory;
 use core::num::Wrapping;
 
 /// Sets a 16-bit register with an immediate value
-pub(crate) fn lxi<S: I8080FamilyState, M: Memory>(
-    state: &mut S,
+pub(crate) fn lxi<E: I8080FamilyEmulator, M: Memory>(
+    state: &mut E,
     memory: &mut M,
-    set_register: fn(&mut S, u16),
+    set_register: fn(&mut E, u16),
 ) -> u8 {
     let d = state.fetch_word(memory);
     set_register(state, d);
@@ -15,7 +14,7 @@ pub(crate) fn lxi<S: I8080FamilyState, M: Memory>(
 }
 
 /// Store the value in the register A into the memory pointed by a 16-bit register
-pub(crate) fn stax<S: I8080FamilyState, M: Memory>(
+pub(crate) fn stax<S: I8080FamilyEmulator, M: Memory>(
     state: &mut S,
     memory: &mut M,
     address_fn: impl Fn(&S) -> u16,
@@ -30,7 +29,7 @@ pub(crate) fn stax<S: I8080FamilyState, M: Memory>(
 }
 
 /// Store the value of a 16-bit register in the immediate memory address
-pub(crate) fn shld_rr<S: I8080FamilyState>(
+pub(crate) fn shld_rr<S: I8080FamilyEmulator>(
     state: &mut S,
     memory: &mut impl Memory,
     register: impl Fn(&S) -> u16,
@@ -45,7 +44,7 @@ pub(crate) fn shld_rr<S: I8080FamilyState>(
 }
 
 /// Store the value of A in the immediate memory address
-pub(crate) fn sta(state: &mut impl I8080FamilyState, memory: &mut impl Memory) -> u8 {
+pub(crate) fn sta(state: &mut impl I8080FamilyEmulator, memory: &mut impl Memory) -> u8 {
     let address = state.fetch_word(memory);
     state.set_memptr(u16::from_le_bytes([
         address.wrapping_add(1) as u8,
@@ -56,7 +55,7 @@ pub(crate) fn sta(state: &mut impl I8080FamilyState, memory: &mut impl Memory) -
 }
 
 /// Store an immediate value in a register
-pub(crate) fn mvi<S: I8080FamilyState, M: Memory>(
+pub(crate) fn mvi<S: I8080FamilyEmulator, M: Memory>(
     state: &mut S,
     memory: &mut M,
     register: fn(&mut S) -> &mut Wrapping<u8>,
@@ -67,7 +66,7 @@ pub(crate) fn mvi<S: I8080FamilyState, M: Memory>(
 }
 
 /// Store an immediate value in the memory pointed by HL
-pub(crate) fn mvi_mem<S: I8080FamilyState, M: Memory>(state: &mut S, memory: &mut M) -> u8 {
+pub(crate) fn mvi_mem<S: I8080FamilyEmulator, M: Memory>(state: &mut S, memory: &mut M) -> u8 {
     let address = state.get_hl();
     let d = state.fetch_byte(memory);
     memory.store(address, d);
@@ -75,7 +74,7 @@ pub(crate) fn mvi_mem<S: I8080FamilyState, M: Memory>(state: &mut S, memory: &mu
 }
 
 /// Load the value in the address pointed by the 16-bit register and put it in A.
-pub(crate) fn ldax<S: I8080FamilyState, M: Memory>(
+pub(crate) fn ldax<S: I8080FamilyEmulator, M: Memory>(
     state: &mut S,
     memory: &M,
     address_fn: impl Fn(&S) -> u16,
@@ -88,7 +87,7 @@ pub(crate) fn ldax<S: I8080FamilyState, M: Memory>(
 }
 
 /// Load the value pointed by the immediate address into the 16-bit register
-pub(crate) fn lhld_rr<S: I8080FamilyState>(
+pub(crate) fn lhld_rr<S: I8080FamilyEmulator>(
     state: &mut S,
     memory: &mut impl Memory,
     setter: impl Fn(&mut S, u16),
@@ -102,7 +101,7 @@ pub(crate) fn lhld_rr<S: I8080FamilyState>(
 }
 
 /// Load the value pointed by the immediate address into A
-pub(crate) fn lda(state: &mut impl I8080FamilyState, memory: &mut impl Memory) -> u8 {
+pub(crate) fn lda(state: &mut impl I8080FamilyEmulator, memory: &mut impl Memory) -> u8 {
     let address = state.fetch_word(memory);
     state.set_memptr(address.wrapping_add(1));
     state.get_a_mut().0 = memory.load(address);
@@ -110,7 +109,7 @@ pub(crate) fn lda(state: &mut impl I8080FamilyState, memory: &mut impl Memory) -
 }
 
 /// Move the value in the source register to the destination register
-pub(crate) fn mov<S: I8080FamilyState>(
+pub(crate) fn mov<S: I8080FamilyEmulator>(
     state: &mut S,
     dst: fn(&mut S) -> &mut Wrapping<u8>,
     src: fn(&S) -> Wrapping<u8>,
@@ -122,7 +121,7 @@ pub(crate) fn mov<S: I8080FamilyState>(
 }
 
 /// Move the value in the memory pointed by HL to the register
-pub(crate) fn mov_r_mem<S: I8080FamilyState>(
+pub(crate) fn mov_r_mem<S: I8080FamilyEmulator>(
     state: &mut S,
     register: fn(&mut S) -> &mut Wrapping<u8>,
     memory: &mut impl Memory,
@@ -133,7 +132,7 @@ pub(crate) fn mov_r_mem<S: I8080FamilyState>(
 }
 
 /// Move the value in the register to the memory pointed by HL
-pub(crate) fn mov_mem_r<S: I8080FamilyState>(
+pub(crate) fn mov_mem_r<S: I8080FamilyEmulator>(
     state: &S,
     memory: &mut impl Memory,
     register: fn(&S) -> Wrapping<u8>,
@@ -144,7 +143,7 @@ pub(crate) fn mov_mem_r<S: I8080FamilyState>(
 
 /// Exchanges HL with the top of the stack
 pub(crate) fn xthl(
-    state: &mut impl I8080FamilyState,
+    state: &mut impl I8080FamilyEmulator,
     memory: &mut impl Memory,
     clock_cycles: u8,
 ) -> u8 {
@@ -156,13 +155,13 @@ pub(crate) fn xthl(
 }
 
 /// Move HL to SP
-pub(crate) fn sphl(state: &mut impl I8080FamilyState, cycles: u8) -> u8 {
+pub(crate) fn sphl(state: &mut impl I8080FamilyEmulator, cycles: u8) -> u8 {
     state.get_sp_mut().0 = state.get_hl();
     cycles
 }
 
 /// Exchanges DE and HL
-pub(crate) fn xchg(state: &mut impl I8080FamilyState) -> u8 {
+pub(crate) fn xchg(state: &mut impl I8080FamilyEmulator) -> u8 {
     let d = state.get_d();
     *state.get_d_mut() = state.get_h();
     *state.get_h_mut() = d;

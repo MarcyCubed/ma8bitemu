@@ -1,43 +1,43 @@
 //! 8080 instructions that work differently in the Z80
 
-use crate::i8080::I8080FamilyState;
+use crate::i8080::I8080FamilyEmulator;
 use crate::i8080::math::{add_value, check_carry};
 use crate::memory::Memory;
-use crate::z80::State;
+use crate::z80::Emulator;
 use core::num::Wrapping;
 
-/// Do `a - b - borrow`, update the flags in the state and return the result
+/// Do `a - b - borrow`, update the flags and return the result
 #[inline]
-pub(super) fn sub_flags(state: &mut State, a: u8, b: u8, borrow: bool) -> u8 {
+pub(super) fn sub_flags(emulator: &mut Emulator, a: u8, b: u8, borrow: bool) -> u8 {
     let a = a as u16;
     let b = b as u16;
     let mut c = Wrapping(a as u16);
     c -= b;
     c -= borrow as u16;
-    state.cf = c.0 & 0x100 != 0;
-    state.hf = check_carry(4, a, b, c.0);
-    state.nf = true;
-    state.pf = check_carry(7, a, b, c.0) != state.cf;
+    emulator.cf = c.0 & 0x100 != 0;
+    emulator.hf = check_carry(4, a, b, c.0);
+    emulator.nf = true;
+    emulator.pf = check_carry(7, a, b, c.0) != emulator.cf;
     let value = c.0 as u8;
-    state.flags_from_value(value);
+    emulator.flags_from_value(value);
     value
 }
 
 /// Subtract a value and a borrow from A, updating the flags
-pub(super) fn sub_value(state: &mut State, value: u8, borrow: bool) {
-    state.a.0 = sub_flags(state, state.a.0, value, borrow);
+pub(super) fn sub_value(emulator: &mut Emulator, value: u8, borrow: bool) {
+    emulator.a.0 = sub_flags(emulator, emulator.a.0, value, borrow);
 }
 
-/// Decrement a value and set the appropriate flags on the state.
+/// Decrement a value and set the appropriate flags.
 ///
 /// Return the decremented value.
 #[inline]
-pub(super) fn dec_flags(state: &mut State, value: u8) -> u8 {
+pub(super) fn dec_flags(emulator: &mut Emulator, value: u8) -> u8 {
     let new_value = value.wrapping_sub(1);
-    state.flags_from_value(new_value);
-    state.pf = new_value == 0x7f;
-    state.hf = (new_value ^ value) & (1 << State::H_FLAG_BIT) != 0;
-    state.nf = true;
+    emulator.flags_from_value(new_value);
+    emulator.pf = new_value == 0x7f;
+    emulator.hf = (new_value ^ value) & (1 << Emulator::H_FLAG_BIT) != 0;
+    emulator.nf = true;
     new_value
 }
 
@@ -46,19 +46,24 @@ pub(super) fn dec_flags(state: &mut State, value: u8) -> u8 {
 /// Return the number of clock cycles it takes to execute the instruction
 #[inline]
 pub(super) fn dec_r(
-    state: &mut State,
-    get_register: impl Fn(&mut State) -> &mut Wrapping<u8>,
+    emulator: &mut Emulator,
+    get_register: impl Fn(&mut Emulator) -> &mut Wrapping<u8>,
 ) -> u8 {
-    let old_value = *get_register(state);
-    let new_value = dec_flags(state, old_value.0);
-    get_register(state).0 = new_value;
+    let old_value = *get_register(emulator);
+    let new_value = dec_flags(emulator, old_value.0);
+    get_register(emulator).0 = new_value;
     4
 }
 
 /// Decrement a value in memory and set the appropriate flags
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(super) fn dec_mem(state: &mut State, memory: &mut impl Memory, address: u16, cycles: u8) -> u8 {
+pub(super) fn dec_mem(
+    state: &mut Emulator,
+    memory: &mut impl Memory,
+    address: u16,
+    cycles: u8,
+) -> u8 {
     let value = dec_flags(state, memory.load(address));
     memory.store(address, value);
     cycles
@@ -67,7 +72,7 @@ pub(super) fn dec_mem(state: &mut State, memory: &mut impl Memory, address: u16,
 /// Adjust a BCD value after a math operation
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(super) fn daa(state: &mut State) -> u8 {
+pub(super) fn daa(state: &mut Emulator) -> u8 {
     let a = state.a.0;
 
     let mut diff = 0;
@@ -93,7 +98,7 @@ pub(super) fn daa(state: &mut State) -> u8 {
 /// Set the carry flag
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(super) fn scf(state: &mut State) -> u8 {
+pub(super) fn scf(state: &mut Emulator) -> u8 {
     state.xy_from_accumulator();
     state.cf = true;
     state.nf = false;
@@ -102,7 +107,7 @@ pub(super) fn scf(state: &mut State) -> u8 {
 }
 
 /// Add a 16-bit value and a carry to HL and set the flags.
-pub(super) fn add_hl_value(state: &mut State, value: u16, carry: bool) {
+pub(super) fn add_hl_value(state: &mut Emulator, value: u16, carry: bool) {
     state.mem_ptr.0 = state.get_hl();
     state.mem_ptr += 1;
     let (result, carry_0) = state.get_hl().overflowing_add(value);
@@ -111,7 +116,7 @@ pub(super) fn add_hl_value(state: &mut State, value: u16, carry: bool) {
     state.cf = carry_0 || carry_1;
     let [result_low, result_high] = result.to_le_bytes();
     state.hf = check_carry(
-        State::H_FLAG_BIT,
+        Emulator::H_FLAG_BIT,
         state.h.0 as u16,
         value >> 8,
         result_high as u16,
@@ -124,7 +129,7 @@ pub(super) fn add_hl_value(state: &mut State, value: u16, carry: bool) {
 /// Complement of the accumulator
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(super) fn cpl(state: &mut State) -> u8 {
+pub(super) fn cpl(state: &mut Emulator) -> u8 {
     state.a.0 = !state.a.0;
     state.nf = true;
     state.hf = true;
@@ -135,7 +140,7 @@ pub(super) fn cpl(state: &mut State) -> u8 {
 /// Invert the carry flag
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(super) fn ccf(state: &mut State) -> u8 {
+pub(super) fn ccf(state: &mut Emulator) -> u8 {
     state.hf = state.cf;
     state.cf = !state.cf;
     state.nf = false;
@@ -147,7 +152,7 @@ pub(super) fn ccf(state: &mut State) -> u8 {
 /// Perform a logical AND between the value and the accumulator, updating the flags
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(super) fn and_value(state: &mut State, value: u8) -> u8 {
+pub(super) fn and_value(state: &mut Emulator, value: u8) -> u8 {
     state.a.0 &= value;
     state.flags_from_accumulator();
     state.parity_from_accumulator();
@@ -160,14 +165,14 @@ pub(super) fn and_value(state: &mut State, value: u8) -> u8 {
 /// Compare the accumulator to the value, updating the flags
 ///
 /// Return the number of clock cycles it took to execute the instruction
-pub(super) fn cp_value(state: &mut State, value: u8) -> u8 {
+pub(super) fn cp_value(state: &mut Emulator, value: u8) -> u8 {
     sub_flags(state, state.a.0, value, false);
     state.xy_from_value(value);
     4
 }
 
 /// Rotate the accumulator left and copy the bit that wrapped around to the carry flag
-pub(super) fn rlca(state: &mut State) -> u8 {
+pub(super) fn rlca(state: &mut Emulator) -> u8 {
     state.a.0 = state.a.0.rotate_left(1);
     state.cf = state.a.0 & 0x1 != 0;
     state.nf = false;
@@ -177,7 +182,7 @@ pub(super) fn rlca(state: &mut State) -> u8 {
 }
 
 /// Rotate the accumulator right and copy the bit that wrapped around to the carry flag
-pub(crate) fn rrca(state: &mut State) -> u8 {
+pub(crate) fn rrca(state: &mut Emulator) -> u8 {
     state.cf = state.a.0 & 0x1 != 0;
     state.a.0 = state.a.0.rotate_right(1);
     state.nf = false;
