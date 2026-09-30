@@ -34,12 +34,9 @@ pub(crate) fn shld_rr<S: I8080FamilyEmulator>(
     memory: &mut impl Memory,
     register: impl Fn(&S) -> u16,
 ) -> u8 {
-    let address_0 = state.fetch_word(memory);
-    let address_1 = address_0.wrapping_add(1);
-    state.set_memptr(address_1);
-    let values = register(state).to_le_bytes();
-    memory.store(address_0, values[0]);
-    memory.store(address_1, values[1]);
+    let address = state.fetch_word(memory);
+    state.set_memptr(address.wrapping_add(1));
+    memory.store_16(address, register(state));
     16
 }
 
@@ -92,11 +89,9 @@ pub(crate) fn lhld_rr<S: I8080FamilyEmulator>(
     memory: &mut impl Memory,
     setter: impl Fn(&mut S, u16),
 ) -> u8 {
-    let address_0 = state.fetch_word(memory);
-    let address_1 = address_0.wrapping_add(1);
-    state.set_memptr(address_1);
-    let value = u16::from_le_bytes([memory.load(address_0), memory.load(address_1)]);
-    setter(state, value);
+    let address = state.fetch_word(memory);
+    state.set_memptr(address.wrapping_add(1));
+    setter(state, memory.load_16(address));
     16
 }
 
