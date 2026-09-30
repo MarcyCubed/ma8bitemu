@@ -9,6 +9,24 @@ use crate::z80::{Emulator, z8080};
 use crate::{ExecEffect, i8080};
 use std::num::Wrapping;
 
+macro_rules! in_r_bc {
+    ($emulator:ident, $body:expr) => {{
+        $emulator.input_continuation = Some(|emu, input| {
+            $body(emu, input);
+            emu.nf = false;
+            emu.hf = false;
+            emu.parity_flag(input);
+            emu.flags_from_value(input);
+        });
+        (
+            12,
+            ExecEffect::In {
+                port: $emulator.get_bc(),
+            },
+        )
+    }};
+}
+
 /// Execute a prefix ED instruction
 ///
 /// Return the number of clock cycles it took to execute the instruction and the result of the
@@ -25,10 +43,15 @@ pub(super) fn run_opcode(
         0x78 => {
             emulator.mem_ptr.0 = emulator.get_bc();
             emulator.mem_ptr += 1;
-            in_r_bc(emulator, opcode)
+            in_r_bc!(emulator, |emu: &mut Emulator, input| emu.a.0 = input)
         }
-        // IN r, (C)
-        0x40 | 0x48 | 0x50 | 0x58 | 0x60 | 0x68 | 0x70 => in_r_bc(emulator, opcode),
+        0x40 => in_r_bc!(emulator, |emu: &mut Emulator, input| emu.b.0 = input),
+        0x48 => in_r_bc!(emulator, |emu: &mut Emulator, input| emu.c.0 = input),
+        0x50 => in_r_bc!(emulator, |emu: &mut Emulator, input| emu.d.0 = input),
+        0x58 => in_r_bc!(emulator, |emu: &mut Emulator, input| emu.e.0 = input),
+        0x60 => in_r_bc!(emulator, |emu: &mut Emulator, input| emu.h.0 = input),
+        0x68 => in_r_bc!(emulator, |emu: &mut Emulator, input| emu.l.0 = input),
+        0x70 => in_r_bc!(emulator, |_: &mut Emulator, _| {}),
         // OUT (C), a
         0x79 => {
             emulator.mem_ptr.0 = emulator.get_bc();
@@ -136,17 +159,6 @@ pub(super) fn run_opcode(
         // NOP is the default
         _ => (8, ExecEffect::Normal),
     }
-}
-
-/// IN instruction
-fn in_r_bc(emulator: &mut Emulator, opcode: u8) -> (u8, ExecEffect) {
-    emulator.in_opcode = opcode;
-    (
-        12,
-        ExecEffect::In {
-            port: emulator.get_bc(),
-        },
-    )
 }
 
 /// Run an OUT instruction

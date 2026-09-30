@@ -8,7 +8,7 @@ use core::mem;
 use std::num::Wrapping;
 
 /// The Z80 emulator
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Emulator {
     /// The accumulator
     pub a: Wrapping<u8>,
@@ -76,14 +76,14 @@ pub struct Emulator {
     pub yf: bool,
     /// Undocumented register `MEMPTR`
     pub mem_ptr: Wrapping<u16>,
-    /// Opcode of the `in` instruction
-    pub(crate) in_opcode: u8,
     /// The effect of the last instruction
     last_effect: ExecEffect,
     /// The interrupt vector if an interrupt was caused by external hardware
     interrupt_vector: Option<u8>,
     /// Is there a pending NMI?
     nmi_pending: bool,
+    /// The input continuation
+    pub(super) input_continuation: Option<InputContinuation>,
 }
 
 /// How the processor handles interruptions
@@ -101,6 +101,9 @@ pub enum InterruptMode {
     /// byte.
     Vectored,
 }
+
+/// Function that handles receiving input and finishing the IN instruction
+pub(super) type InputContinuation = fn(&mut Emulator, u8);
 
 impl Emulator {
     /// Create a Z80 emulator
@@ -139,10 +142,10 @@ impl Emulator {
             xf: true,
             yf: true,
             mem_ptr: Default::default(),
-            in_opcode: 0,
             last_effect: ExecEffect::Normal,
             interrupt_vector: None,
             nmi_pending: false,
+            input_continuation: None,
         }
     }
 
@@ -246,6 +249,7 @@ impl EmulatorCore for Emulator {
     fn run_opcode(&mut self, opcode: u8, memory: &mut impl Memory) -> (u8, ExecEffect) {
         // Increase the R register
         self.inc_r();
+        self.input_continuation = None;
         // Execute the instruction
         let result = 'main: {
             let clock_cycles = match opcode {
@@ -598,10 +602,10 @@ impl EmulatorCore for Emulator {
                 // in a (n)
                 0xdb => {
                     let port = self.fetch_byte(memory) as u16;
-                    self.in_opcode = opcode;
                     self.mem_ptr.0 = self.a.0 as u16;
                     self.mem_ptr += port;
                     self.mem_ptr += 1;
+                    self.input_continuation = Some(|emu, input| emu.a.0 = input);
                     break 'main (11, ExecEffect::In { port });
                 }
                 0xeb => i8080::load::xchg(self), // XCHG
@@ -904,28 +908,10 @@ impl I8080FamilyEmulator for Emulator {
         self.mem_ptr.0 = address
     }
 
-    /// Give the emulator an input requested by the IN instruction
     fn input(&mut self, value: u8) {
-        // If it's 'IN A, (N)'
-        if self.in_opcode == 0xdb {
-            self.a.0 = value;
-        } else {
-            // Z80-specific 'in' instructions
-            self.nf = false;
-            self.parity_flag(value);
-            self.hf = false;
-            self.flags_from_value(value);
-            // Put the value in a register
-            match self.in_opcode {
-                0x40 => self.b.0 = value,
-                0x48 => self.c.0 = value,
-                0x50 => self.d.0 = value,
-                0x58 => self.e.0 = value,
-                0x60 => self.h.0 = value,
-                0x68 => self.l.0 = value,
-                0x78 => self.a.0 = value,
-                _ => unreachable!("The opcode isn't from an IN instruction"),
-            }
+        if let Some(cont) = self.input_continuation {
+            cont(self, value);
+            self.input_continuation = None;
         }
     }
 
