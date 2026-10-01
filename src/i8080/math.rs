@@ -42,7 +42,10 @@ pub(crate) fn inc<E: I8080FamilyEmulator>(
 ///
 /// Return the incremented value.
 #[inline]
-fn inc_value(emulator: &mut impl I8080FamilyEmulator, value: Wrapping<u8>) -> Wrapping<u8> {
+pub(crate) fn inc_value(
+    emulator: &mut impl I8080FamilyEmulator,
+    value: Wrapping<u8>,
+) -> Wrapping<u8> {
     let mut new_value = value;
     new_value += 1;
     emulator.flags_from_value(new_value.0);

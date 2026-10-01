@@ -2,7 +2,7 @@
 
 use crate::i8080::I8080FamilyEmulator;
 use crate::memory::Memory;
-use crate::z80::{bits, misc, z8080};
+use crate::z80::{bits, indexed, misc, z8080};
 use crate::{EmulatorCore, ExecEffect, Fetch, i8080};
 use core::mem;
 use std::num::Wrapping;
@@ -305,26 +305,30 @@ impl EmulatorCore for Emulator {
                 // add hl, bc
                 0x09 => {
                     let value = self.get_bc();
-                    z8080::add_hl_value(self, value, false);
-                    7
+                    let hl = z8080::double_add_flags(self, self.get_hl(), value, false);
+                    self.set_hl(hl);
+                    11
                 }
                 // add hl, de
                 0x19 => {
                     let value = self.get_de();
-                    z8080::add_hl_value(self, value, false);
-                    7
+                    let hl = z8080::double_add_flags(self, self.get_hl(), value, false);
+                    self.set_hl(hl);
+                    11
                 }
                 // add hl, hl
                 0x29 => {
                     let value = self.get_hl();
-                    z8080::add_hl_value(self, value, false);
-                    7
+                    let hl = z8080::double_add_flags(self, self.get_hl(), value, false);
+                    self.set_hl(hl);
+                    11
                 }
                 // add hl, sp
                 0x39 => {
                     let value = self.sp.0;
-                    z8080::add_hl_value(self, value, false);
-                    7
+                    let hl = z8080::double_add_flags(self, self.get_hl(), value, false);
+                    self.set_hl(hl);
+                    11
                 }
                 0x0a => i8080::load::ldax(self, memory, Self::get_bc), // ld a, (bc)
                 0x1a => i8080::load::ldax(self, memory, Self::get_de), // ld a, (de)
@@ -656,13 +660,21 @@ impl EmulatorCore for Emulator {
                     let opcode = self.fetch_byte(memory);
                     bits::run_opcode(self, opcode, memory)
                 }
-                0xdd => todo!("IX instructions"),
+                // DD prefix instructions
+                0xdd => {
+                    let opcode = self.fetch_byte(memory);
+                    break 'main indexed::run_opcode::<indexed::IX>(self, opcode, memory);
+                }
                 // ED prefix Instructions
                 0xed => {
                     let opcode = self.fetch_byte(memory);
                     break 'main misc::run_opcode(self, opcode, memory);
                 }
-                0xfd => todo!("IY instructions"),
+                // FD prefix instructions
+                0xfd => {
+                    let opcode = self.fetch_byte(memory);
+                    break 'main indexed::run_opcode::<indexed::IY>(self, opcode, memory);
+                }
             };
             (clock_cycles, ExecEffect::Normal)
         };

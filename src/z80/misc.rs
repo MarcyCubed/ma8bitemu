@@ -4,7 +4,7 @@ use crate::i8080::I8080FamilyEmulator;
 use crate::i8080::load::{lhld_rr, shld_rr};
 use crate::memory::Memory;
 use crate::z80::emulator::InterruptMode;
-use crate::z80::z8080::add_hl_value;
+use crate::z80::z8080::double_add_flags;
 use crate::z80::{Emulator, z8080};
 use crate::{ExecEffect, i8080};
 use std::num::Wrapping;
@@ -174,7 +174,8 @@ fn out_value(emulator: &mut Emulator, data: u8) -> (u8, ExecEffect) {
 
 /// Subtract the value and the carry from HL
 fn sbc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEffect) {
-    add_hl_value(emulator, !value, !carry);
+    let diff = double_add_flags(emulator, emulator.get_hl(), !value, !carry);
+    emulator.set_hl(diff);
     emulator.nf = true;
     emulator.hf = !emulator.hf;
     emulator.cf = !emulator.cf;
@@ -183,7 +184,8 @@ fn sbc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEf
 
 /// Add the value and the carry to HL
 fn adc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEffect) {
-    add_hl_value(emulator, value, carry);
+    let sum = double_add_flags(emulator, emulator.get_hl(), value, carry);
+    emulator.set_hl(sum);
     (15, ExecEffect::Normal)
 }
 

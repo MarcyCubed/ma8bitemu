@@ -106,24 +106,20 @@ pub(super) fn scf(state: &mut Emulator) -> u8 {
     4
 }
 
-/// Add a 16-bit value and a carry to HL and set the flags.
-pub(super) fn add_hl_value(state: &mut Emulator, value: u16, carry: bool) {
-    state.mem_ptr.0 = state.get_hl();
+/// Adds two 16-bit values and a carry together and set the flags.
+///
+/// Return the sum
+pub(super) fn double_add_flags(state: &mut Emulator, a: u16, b: u16, carry: bool) -> u16 {
+    state.mem_ptr.0 = a;
     state.mem_ptr += 1;
-    let (result, carry_0) = state.get_hl().overflowing_add(value);
+    let (result, carry_0) = a.overflowing_add(b);
     let (result, carry_1) = result.overflowing_add(carry as u16);
     state.nf = false;
     state.cf = carry_0 || carry_1;
-    let [result_low, result_high] = result.to_le_bytes();
-    state.hf = check_carry(
-        Emulator::H_FLAG_BIT,
-        state.h.0 as u16,
-        value >> 8,
-        result_high as u16,
-    );
-    state.xy_from_value(result_high);
-    state.h.0 = result_high;
-    state.l.0 = result_low;
+    let result_high = result >> 8;
+    state.hf = check_carry(Emulator::H_FLAG_BIT, state.h.0 as u16, b >> 8, result_high);
+    state.xy_from_value(result_high as u8);
+    result
 }
 
 /// Complement of the accumulator
