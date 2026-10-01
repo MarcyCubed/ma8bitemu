@@ -15,7 +15,7 @@ macro_rules! in_r_bc {
             $body(emu, input);
             emu.nf = false;
             emu.hf = false;
-            emu.parity_flag(input);
+            emu.parity_from_value(input);
             emu.flags_from_value(input);
         });
         (

@@ -12,7 +12,7 @@ fn bit_move_flags(emulator: &mut Emulator, value: u8, action: fn(&mut Emulator, 
     let value = value.rotate_left(1);
     let value = action(emulator, value);
     emulator.flags_from_value(value);
-    emulator.parity_flag(value);
+    emulator.parity_from_value(value);
     emulator.nf = false;
     emulator.hf = false;
     value

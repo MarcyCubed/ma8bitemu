@@ -152,13 +152,13 @@ pub trait I8080FamilyEmulator: EmulatorCore {
     fn overflow_flag(&mut self, overflow: bool);
 
     /// Set the parity flag from a value
-    fn parity_flag(&mut self, value: u8);
+    fn parity_from_value(&mut self, value: u8);
 
     /// Get the parity flag from the accumulator
     #[inline]
     fn parity_from_accumulator(&mut self) {
         let a = self.get_a().0;
-        self.parity_flag(a);
+        self.parity_from_value(a);
     }
 
     /// Turn the flags into a bitmap

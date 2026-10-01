@@ -550,7 +550,7 @@ impl I8080FamilyEmulator for Emulator {
     }
 
     #[inline]
-    fn parity_flag(&mut self, _value: u8) {
+    fn parity_from_value(&mut self, _value: u8) {
         // Already done by flags_from_value
     }
 

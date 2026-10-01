@@ -788,7 +788,7 @@ impl I8080FamilyEmulator for Emulator {
     }
 
     #[inline]
-    fn parity_flag(&mut self, value: u8) {
+    fn parity_from_value(&mut self, value: u8) {
         self.pf = value.count_ones() & 1 == 0;
     }
 
