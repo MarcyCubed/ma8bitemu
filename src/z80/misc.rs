@@ -174,22 +174,22 @@ fn out_value(emulator: &mut Emulator, data: u8) -> (u8, ExecEffect) {
 
 /// Subtract the value and the carry from HL
 fn sbc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEffect) {
-    let diff = double_add_flags(emulator, emulator.get_hl(), !value, !carry);
-    emulator.set_hl(diff);
+    adc_hl_flags(emulator, !value, !carry).0;
     emulator.nf = true;
     emulator.hf = !emulator.hf;
     emulator.cf = !emulator.cf;
-    emulator.zf = diff == 0;
-    emulator.sf = diff >> 15 != 0;
     (15, ExecEffect::Normal)
 }
 
 /// Add the value and the carry to HL
 fn adc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEffect) {
-    let sum = double_add_flags(emulator, emulator.get_hl(), value, carry);
+    let hl = emulator.get_hl();
+    let sum = double_add_flags(emulator, hl, value, carry);
     emulator.set_hl(sum);
     emulator.zf = sum == 0;
     emulator.sf = sum >> 15 != 0;
+    let sign = 1 << 15;
+    emulator.pf = hl & sign == value & sign && hl & sign != sum & sign;
     (15, ExecEffect::Normal)
 }
 
