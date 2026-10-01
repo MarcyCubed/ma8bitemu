@@ -5,7 +5,7 @@ use crate::i8080::jump::{pop_stack, push_stack};
 use crate::i8080::math::{add_value, inc_value, or_value, xor_value};
 use crate::memory::Memory;
 use crate::z80::z8080::{and_value, cp_value, dec_flags, sub_value};
-use crate::z80::{Emulator, z8080};
+use crate::z80::{Emulator, double_prefix, z8080};
 use crate::{ExecEffect, Fetch};
 use std::num::Wrapping;
 
@@ -378,11 +378,16 @@ pub(super) fn run_opcode<I: IndexRegister>(
             emulator.sp = I::get(emulator);
             10
         }
-
-        0xcb => todo!("Indexed bit instructions"),
+        // Instruction has two prefixes
+        0xcb => {
+            let d = emulator.fetch_byte(memory);
+            let opcode = emulator.fetch_byte(memory);
+            let address = I::displace(emulator, d);
+            double_prefix::run_opcode(emulator, address, opcode, memory)
+        }
         // Prefix on a normal instruction behaves as a NOP
         _ => {
-            // Backtrack so we'll interpret this opcode as a regular instruction next time
+            // Backtrack, so we'll interpret this opcode as a regular instruction next time
             emulator.r = saved_r;
             emulator.pc -= 1;
             4 // Just a regular NOP. Nothing to see
