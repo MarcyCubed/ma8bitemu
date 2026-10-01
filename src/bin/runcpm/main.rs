@@ -5,7 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(clap::Parser, Debug)]
-#[command(version, about = "Run simple CPM/80 programs", long_about = None)]
+#[command(version, about = "Run simple CP/M-80 programs", long_about = None)]
 struct Args {
     /// Start to display the emulator state after executing this number of instructions
     #[arg(short, long)]
@@ -18,7 +18,7 @@ struct Args {
     /// The CP/M-80 program to run
     program: PathBuf,
 
-    /// Use the Z80 emulator instead of Intel 8080
+    /// Emulate the Z80 processor instead of the Intel 8080
     #[arg(short = 'z', long)]
     use_z80: bool,
 }
