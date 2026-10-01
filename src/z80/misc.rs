@@ -142,12 +142,12 @@ pub(super) fn run_opcode(
             i8080::jump::ret(emulator, memory);
             (14, ExecEffect::Normal)
         }
-        0xa0 => ldx(emulator, memory, 1),                    // ldi
-        0xa8 => ldx(emulator, memory, -1),                   // ldd
-        0xb0 => repeat(ldx, |s| s.pf, emulator, memory, 1),  // ldir
-        0xb8 => repeat(ldx, |s| s.pf, emulator, memory, -1), // lddr
-        0xa1 => cpx(emulator, memory, 1),                    // cpi
-        0xa9 => cpx(emulator, memory, -1),                   // cpd
+        0xa0 => ldx(emulator, memory, 1),   // ldi
+        0xa8 => ldx(emulator, memory, -1),  // ldd
+        0xb0 => ldxr(emulator, memory, 1),  // ldir
+        0xb8 => ldxr(emulator, memory, -1), // lddr
+        0xa1 => cpx(emulator, memory, 1),   // cpi
+        0xa9 => cpx(emulator, memory, -1),  // cpd
         0xb1 => repeat(cpx, |s| s.pf || s.zf, emulator, memory, 1), // cpir
         0xb9 => repeat(cpx, |s| s.pf || s.zf, emulator, memory, -1), // cpdr
         0xa2 | 0xaa | 0xb2 | 0xba => todo!("Input needs to be reworked"),
@@ -254,12 +254,28 @@ fn ldx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, E
     emulator.set_bc(bc);
     emulator.hf = false;
     emulator.nf = false;
-    emulator.pf = bc == 0;
+    emulator.pf = bc != 0;
     // XY flags are weird here
     let data = emulator.a + Wrapping(data);
     emulator.xf = data.0 & 0b1000 != 0;
     emulator.yf = data.0 & 0b10 != 0;
     (16, ExecEffect::Normal)
+}
+
+/// LDXR: Repeat LDX until the counter is 0
+fn ldxr(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
+    ldx(emulator, memory, offset);
+    (
+        if emulator.pf {
+            emulator.mem_ptr = emulator.pc;
+            emulator.mem_ptr -= 1;
+            emulator.pc -= 2;
+            21
+        } else {
+            16
+        },
+        ExecEffect::Normal,
+    )
 }
 
 /// Implement one of the repeated instructions
