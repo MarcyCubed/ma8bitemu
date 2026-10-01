@@ -6,6 +6,7 @@ use crate::z80::{Emulator, bits};
 #[inline(always)]
 fn bit(emulator: &mut Emulator, data: u8, bit_number: u32) -> u8 {
     bits::bit_flags(emulator, data, bit_number);
+    emulator.xy_from_value((emulator.mem_ptr.0 >> 8) as u8);
     20
 }
 

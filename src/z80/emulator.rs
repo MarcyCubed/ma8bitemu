@@ -187,6 +187,12 @@ impl Emulator {
         }
     }
 
+    /// Set the S and Z flags from a value
+    pub fn sz_from_value(&mut self, value: u8) {
+        self.zf = value == 0;
+        self.sf = value & (1 << 7) != 0;
+    }
+
     /// Set the X and Y flags from a value
     pub fn xy_from_value(&mut self, value: u8) {
         self.xf = value & (1 << Self::X_FLAG_BIT) != 0;
@@ -776,10 +782,8 @@ impl I8080FamilyEmulator for Emulator {
 
     #[inline]
     fn flags_from_value(&mut self, value: u8) {
-        self.zf = value == 0;
-        self.sf = value & (1 << 7) != 0;
-        self.xf = value & (1 << Self::X_FLAG_BIT) != 0;
-        self.yf = value & (1 << Self::Y_FLAG_BIT) != 0;
+        self.sz_from_value(value);
+        self.xy_from_value(value);
     }
 
     #[inline]

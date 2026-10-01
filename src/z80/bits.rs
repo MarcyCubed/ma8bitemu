@@ -105,9 +105,11 @@ pub(super) fn srl_flags(emulator: &mut Emulator, value: u8) -> u8 {
 /// Check if a bit of the value is 0
 ///
 /// If the bit is `0`, sets the `Z` flag
+///
+/// Return the bit
 pub(super) fn bit_flags(emulator: &mut Emulator, value: u8, bit_number: u32) {
     let bit = value & (1 << bit_number);
-    emulator.flags_from_value(value);
+    emulator.sz_from_value(bit);
     emulator.pf = bit == 0;
     emulator.nf = false;
     emulator.hf = true;
@@ -118,6 +120,7 @@ macro_rules! bit_r {
     ($bit:literal, $emulator:ident, $reg:ident) => {{
         let value = $emulator.$reg.0;
         bit_flags($emulator, value, $bit);
+        $emulator.xy_from_value(value);
         8
     }};
 }
