@@ -117,7 +117,7 @@ pub(super) fn double_add_flags(state: &mut Emulator, a: u16, b: u16, carry: bool
     state.nf = false;
     state.cf = carry_0 || carry_1;
     let result_high = result >> 8;
-    state.hf = check_carry(Emulator::H_FLAG_BIT, state.h.0 as u16, b >> 8, result_high);
+    state.hf = check_carry(Emulator::H_FLAG_BIT + 8, a, b, result);
     state.xy_from_value(result_high as u8);
     result
 }
