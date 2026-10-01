@@ -889,6 +889,7 @@ impl I8080FamilyEmulator for Emulator {
         self.nf = flag
     }
 
+    #[cfg(feature = "std")]
     fn dump(&self, opcode: u8) {
         print!("pc={:04x}h", self.pc);
         print!(",sp={:04x}h", self.sp);
@@ -897,6 +898,40 @@ impl I8080FamilyEmulator for Emulator {
         print!(",bc={:04x}h", self.get_bc());
         print!(",de={:04x}h", self.get_de());
         print!(",hl={:04x}h", self.get_hl());
+        print!(",ix={:04x}h", self.ix);
+        print!(",iy={:04x}h", self.iy);
+        print!(",i={:02x}h", self.i);
+        print!(",r={:02x}h", self.r);
+        print!(",af'={:02x}{:02x}h", self.a_alt, self.f_alt);
+        print!(",bc'={:02x}{:02x}h", self.b_alt, self.c_alt);
+        print!(",de'={:02x}{:02x}h", self.d_alt, self.e_alt);
+        print!(",hl'={:02x}{:02x}h", self.h_alt, self.l_alt);
+        print!(",c={}", self.cf as u8);
+        print!(",po={}", self.pf as u8);
+        print!(",hc={}", self.hf as u8);
+        print!(",n={}", self.nf as u8);
+        print!(",z={}", self.zf as u8);
+        print!(",s={}", self.sf as u8);
+        print!(",memptr={:04x}h", self.mem_ptr);
+
+        println!();
+    }
+
+    #[cfg(feature = "std")]
+    fn dump_memory(&self, memory: &impl Memory) {
+        print!("pc={:04x}h:[{:02x}h", self.pc, memory.load(self.pc.0));
+        for i in 1u16..4 {
+            print!(",{:02x}h", memory.load(self.pc.0.wrapping_add(i)));
+        }
+        print!("],sp={:04x}h:[{:02x}h]", self.sp, memory.load(self.sp.0));
+        print!(",af={:02x}{:02x}h", self.a, self.serialize_flags());
+        print!(",bc={:04x}h", self.get_bc());
+        print!(",de={:04x}h", self.get_de());
+        print!(
+            ",hl={:04x}h:[{:02x}h]",
+            self.get_hl(),
+            memory.load(self.get_hl())
+        );
         print!(",ix={:04x}h", self.ix);
         print!(",iy={:04x}h", self.iy);
         print!(",i={:02x}h", self.i);

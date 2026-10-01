@@ -211,10 +211,12 @@ pub trait I8080FamilyEmulator: EmulatorCore {
     }
 
     /// Write the state to the screen.
-    ///
-    /// Also shows the opcode if it's known.
     #[cfg(feature = "std")]
     fn dump(&self, opcode: u8);
+
+    /// Write the state of the emulator and some memory data to the screen
+    #[cfg(feature = "std")]
+    fn dump_memory(&self, memory: &impl Memory);
 
     /// Sets the value of the internal register memptr
     fn set_memptr(&mut self, address: u16);

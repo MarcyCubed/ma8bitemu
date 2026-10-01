@@ -661,6 +661,31 @@ impl I8080FamilyEmulator for Emulator {
         println!();
     }
 
+    #[cfg(feature = "std")]
+    fn dump_memory(&self, memory: &impl Memory) {
+        print!("pc={:04x}h:[{:02x}h", self.pc, memory.load(self.pc.0));
+        for i in 1u16..4 {
+            print!(",{:02x}h", memory.load(self.pc.0.wrapping_add(i)));
+        }
+        print!("],sp={:04x}h:[{:02x}h]", self.sp, memory.load(self.sp.0));
+        print!(",af={:02x}{:02x}h", self.a, self.serialize_flags());
+        print!(",bc={:04x}h", self.get_bc());
+        print!(",de={:04x}h", self.get_de());
+        print!(
+            ",hl={:04x}h:[{:02x}h]",
+            self.get_hl(),
+            memory.load(self.get_hl())
+        );
+        print!(",cf={}", self.cf as u8);
+        print!(",pf={}", self.pf as u8);
+        print!(",af={}", self.af as u8);
+        print!(",zf={}", self.zf as u8);
+        print!(",sf={}", self.sf as u8);
+        print!(",iff={}", self.inte as u8);
+
+        println!();
+    }
+
     fn set_memptr(&mut self, _address: u16) {
         // Nothing to do
     }

@@ -91,13 +91,13 @@ impl<E: I8080FamilyEmulator> CpmRunner<E> {
     /// Run the program stored in memory
     fn run(&mut self) {
         loop {
-            let opcode = self.emulator.fetch_byte(&self.memory);
-            self.instruction_counter += 1;
             if self.instruction_counter == self.end {
                 return;
             } else if self.instruction_counter >= self.start {
-                self.emulator.dump(opcode);
+                self.emulator.dump_memory(&self.memory);
             }
+            let opcode = self.emulator.fetch_byte(&self.memory);
+            self.instruction_counter += 1;
             let (cycles, result) = self.emulator.run_opcode(opcode, &mut self.memory);
             self.cycles += cycles as u64;
             match result {
