@@ -179,6 +179,8 @@ fn sbc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEf
     emulator.nf = true;
     emulator.hf = !emulator.hf;
     emulator.cf = !emulator.cf;
+    emulator.zf = diff == 0;
+    emulator.sf = diff >> 15 != 0;
     (15, ExecEffect::Normal)
 }
 
@@ -186,6 +188,8 @@ fn sbc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEf
 fn adc_hl_flags(emulator: &mut Emulator, value: u16, carry: bool) -> (u8, ExecEffect) {
     let sum = double_add_flags(emulator, emulator.get_hl(), value, carry);
     emulator.set_hl(sum);
+    emulator.zf = sum == 0;
+    emulator.sf = sum >> 15 != 0;
     (15, ExecEffect::Normal)
 }
 
