@@ -1,29 +1,47 @@
+use clap::Parser;
 use ma8bitemu::i8080::I8080FamilyEmulator;
-use ma8bitemu::z80::Emulator;
-use ma8bitemu::{EmulatorCore, ExecEffect, Fetch};
+use ma8bitemu::{ExecEffect, i8080, z80};
 use std::fs;
+use std::path::PathBuf;
 
-const MIN_PRINT: usize = usize::MAX;
-const MAX_PRINT: usize = usize::MAX;
+#[derive(clap::Parser, Debug)]
+#[command(version, about = "Run simple CPM/80 programs", long_about = None)]
+struct Args {
+    /// Start to display the emulator state after executing this number of instructions
+    #[arg(short, long)]
+    start: Option<u64>,
 
-//const MIN_PRINT: usize = 000000;
-//const MAX_PRINT: usize = 100000;
+    /// Stop displaying the emulator state after executing this number of instructions
+    #[arg(short, long)]
+    end: Option<u64>,
+
+    /// The CP/M-80 program to run
+    program: PathBuf,
+
+    /// Use the Z80 emulator instead of Intel 8080
+    #[arg(short = 'z', long)]
+    use_z80: bool,
+}
 
 /// Run a program in a very limited CP/M emulation
-struct CpmRunner {
+struct CpmRunner<E> {
     /// The number of instructions executed
-    instruction_counter: usize,
+    instruction_counter: u64,
     /// The number of cycles taken
     cycles: u64,
     /// The memory
     memory: [u8; 1 << 16],
     /// The emulator that will run the program
-    emulator: Emulator,
+    emulator: E,
+    /// Start to display the emulator state after executing this number of instructions
+    start: u64,
+    /// Stop displaying the emulator state after executing this number of instructions
+    end: u64,
 }
 
-impl CpmRunner {
+impl<E: I8080FamilyEmulator> CpmRunner<E> {
     /// Create a new runner
-    fn new(program: &[u8]) -> Self {
+    fn new(program: &[u8], emulator: E, args: Args) -> Self {
         // We initialize the memory with "HALT" instructions, so whenever we go where we shouldn't the
         // program crashes.
         let mut memory = [0x76; 0x10000];
@@ -40,19 +58,21 @@ impl CpmRunner {
             instruction_counter: 0,
             cycles: 0,
             memory,
-            emulator: Emulator::new(),
+            emulator,
+            start: args.start.unwrap_or(u64::MAX),
+            end: args.start.unwrap_or(u64::MAX),
         };
         // Point PC to the start of the program
-        runner.emulator.pc.0 = 0x100;
+        runner.emulator.get_pc_mut().0 = 0x100;
         runner
     }
 
     /// Handle CP/M BDOS calls 2 and 9
     fn bdos_call(&self) {
-        match self.emulator.c.0 {
+        match self.emulator.get_c().0 {
             2 => {
                 // Function 2: Print s character to the screen
-                print!("{}", self.emulator.e.0 as char);
+                print!("{}", self.emulator.get_e().0 as char);
             }
             9 => {
                 // Function 9: Write a $ terminated string to the screen
@@ -71,9 +91,9 @@ impl CpmRunner {
         loop {
             let opcode = self.emulator.fetch_byte(&self.memory);
             self.instruction_counter += 1;
-            if self.instruction_counter == MAX_PRINT {
+            if self.instruction_counter == self.end {
                 return;
-            } else if self.instruction_counter >= MIN_PRINT {
+            } else if self.instruction_counter >= self.start {
                 self.emulator.dump(opcode);
             }
             let (cycles, result) = self.emulator.run_opcode(opcode, &mut self.memory);
@@ -100,15 +120,23 @@ impl CpmRunner {
 }
 
 fn main() {
-    for file in std::env::args().skip(1) {
-        match fs::read(&file) {
-            Ok(file) => {
-                let mut runner = CpmRunner::new(&file);
+    let args = Args::parse();
+    match fs::read(&args.program) {
+        Ok(file) => {
+            if args.use_z80 {
+                let mut runner = CpmRunner::new(&file, z80::Emulator::new(), args);
+                runner.run();
+            } else {
+                let mut runner = CpmRunner::new(&file, i8080::Emulator::new(), args);
                 runner.run();
             }
-            Err(error) => {
-                eprintln!("Can't open file {} : {}", file, error)
-            }
+        }
+        Err(error) => {
+            eprintln!(
+                "Can't open file {} : {}",
+                args.program.to_string_lossy(),
+                error
+            )
         }
     }
 }
