@@ -925,8 +925,16 @@ impl I8080FamilyEmulator for Emulator {
         }
         print!("],sp={:04x}h:[{:02x}h]", self.sp, memory.load(self.sp.0));
         print!(",af={:02x}{:02x}h", self.a, self.serialize_flags());
-        print!(",bc={:04x}h", self.get_bc());
-        print!(",de={:04x}h", self.get_de());
+        print!(
+            ",bc={:04x}h:[{:02x}h]",
+            self.get_bc(),
+            memory.load(self.get_bc())
+        );
+        print!(
+            ",de={:04x}h:[{:02x}h]",
+            self.get_de(),
+            memory.load(self.get_de())
+        );
         print!(
             ",hl={:04x}h:[{:02x}h]",
             self.get_hl(),
