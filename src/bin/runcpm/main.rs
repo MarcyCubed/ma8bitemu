@@ -59,8 +59,10 @@ impl<E: I8080FamilyEmulator> CpmRunner<E> {
             cycles: 0,
             memory,
             emulator,
-            start: args.start.unwrap_or(u64::MAX),
-            end: args.start.unwrap_or(u64::MAX),
+            start: args
+                .start
+                .unwrap_or_else(|| if args.end.is_some() { 0 } else { u64::MAX }),
+            end: args.end.unwrap_or(u64::MAX),
         };
         // Point PC to the start of the program
         runner.emulator.get_pc_mut().0 = 0x100;
