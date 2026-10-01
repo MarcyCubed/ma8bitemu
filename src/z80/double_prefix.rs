@@ -3,11 +3,6 @@
 use crate::memory::Memory;
 use crate::z80::{Emulator, bits};
 
-/// Rhift or rotate instruction
-macro_rules! shift_rotate {
-    ($operation:expr, $emulator:ident, $memory:ident, $address:ident) => {};
-}
-
 #[inline(always)]
 fn bit(emulator: &mut Emulator, data: u8, bit_number: u32) -> u8 {
     bits::bit_flags(emulator, data, bit_number);
