@@ -148,8 +148,8 @@ pub(super) fn run_opcode(
         0xb8 => ldxr(emulator, memory, -1), // lddr
         0xa1 => cpx(emulator, memory, 1),   // cpi
         0xa9 => cpx(emulator, memory, -1),  // cpd
-        0xb1 => repeat(cpx, |s| s.pf || s.zf, emulator, memory, 1), // cpir
-        0xb9 => repeat(cpx, |s| s.pf || s.zf, emulator, memory, -1), // cpdr
+        0xb1 => cpxr(emulator, memory, 1),  // cpir
+        0xb9 => cpxr(emulator, memory, -1), // cpdr
         0xa2 | 0xaa | 0xb2 | 0xba => todo!("Input needs to be reworked"),
         0xa3 => outx(emulator, memory, 1),  // outi
         0xab => outx(emulator, memory, -1), // outd
@@ -308,19 +308,35 @@ fn cpx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, E
     let data = memory.load(emulator.get_hl());
     emulator.set_hl(emulator.get_hl().wrapping_add_signed(offset));
     let carry = emulator.cf;
-    let half_carry = emulator.hf;
     // Compare
-    z8080::sub_flags(emulator, emulator.a.0, data, false);
+    let diff = z8080::sub_flags(emulator, emulator.a.0, data, false);
     emulator.cf = carry;
 
     let bc = emulator.get_bc().wrapping_sub(1);
     emulator.set_bc(bc);
-    emulator.pf = bc == 0;
+    emulator.pf = bc != 0;
     // XY flags are extra weird here
-    let xy_source = data.wrapping_sub(half_carry as u8);
+    let xy_source = diff.wrapping_sub(emulator.hf as u8);
     emulator.xf = xy_source & 0b1000 != 0;
     emulator.yf = xy_source & 0b10 != 0;
+    emulator.mem_ptr.0 = emulator.mem_ptr.0.wrapping_add_signed(offset);
     (16, ExecEffect::Normal)
+}
+
+/// CPXR: Repeat CPX until the counter is 0 or the pointed values are equal
+fn cpxr(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
+    cpx(emulator, memory, offset);
+    (
+        if emulator.pf && !emulator.zf {
+            emulator.mem_ptr = emulator.pc;
+            emulator.mem_ptr += 1;
+            emulator.pc -= 2;
+            21
+        } else {
+            16
+        },
+        ExecEffect::Normal,
+    )
 }
 
 fn outx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
