@@ -197,3 +197,11 @@ pub(super) fn rla(emulator: &mut Emulator) -> u8 {
     emulator.hf = false;
     4
 }
+
+/// Rotate the 9-bit value composed by the C flag and the accumulator to the right
+pub(super) fn rra(emulator: &mut Emulator) -> u8 {
+    i8080::math::rar(emulator);
+    emulator.nf = false;
+    emulator.hf = false;
+    4
+}

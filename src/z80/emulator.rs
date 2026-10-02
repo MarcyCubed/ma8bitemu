@@ -345,7 +345,7 @@ impl EmulatorCore for Emulator {
                 0x2b => i8080::math::dcx(self, Self::get_hl, Self::set_hl), // dec hl
                 0x3b => i8080::math::dcx(self, Self::get_sp_u16, Self::set_sp), // dec sp
                 0x0f => z8080::rrca(self),                             // rrca
-                0x1F => i8080::math::rar(self),                        // rra
+                0x1f => z8080::rra(self),                              // rra
                 0x2f => z8080::cpl(self),                              // cpl
                 0x3f => z8080::ccf(self),                              // ccf
                 // ld x, y
