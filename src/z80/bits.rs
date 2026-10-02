@@ -9,7 +9,6 @@ use crate::z80::Emulator;
 /// `action` is the actual function that manipulate bits. This function take care of the common
 /// flags.
 fn bit_move_flags(emulator: &mut Emulator, value: u8, action: fn(&mut Emulator, u8) -> u8) -> u8 {
-    let value = value.rotate_left(1);
     let value = action(emulator, value);
     emulator.flags_from_value(value);
     emulator.parity_from_value(value);
@@ -37,7 +36,7 @@ pub(super) fn rlc_flags(emulator: &mut Emulator, value: u8) -> u8 {
 pub(super) fn rrc_flags(emulator: &mut Emulator, value: u8) -> u8 {
     bit_move_flags(emulator, value, |emulator, value| {
         emulator.cf = value & 0x1 != 0;
-        let value = value.rotate_left(1);
+        let value = value.rotate_right(1);
         value
     })
 }
