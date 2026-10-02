@@ -1,5 +1,6 @@
 //! 8080 instructions that work differently in the Z80
 
+use crate::i8080;
 use crate::i8080::I8080FamilyEmulator;
 use crate::i8080::math::check_carry;
 use crate::memory::Memory;
@@ -186,5 +187,13 @@ pub(crate) fn rrca(state: &mut Emulator) -> u8 {
     state.nf = false;
     state.hf = false;
     state.xy_from_accumulator();
+    4
+}
+
+/// Rotate the 9-bit value composed by the C flag and the accumulator to the left
+pub(super) fn rla(emulator: &mut Emulator) -> u8 {
+    i8080::math::ral(emulator);
+    emulator.nf = false;
+    emulator.hf = false;
     4
 }

@@ -305,7 +305,7 @@ impl EmulatorCore for Emulator {
                 0x3e => i8080::load::mvi(self, memory, Self::get_a_mut), // ld a, n
                 0x36 => i8080::load::mvi_mem(self, memory),              // ld (hl), n
                 0x07 => z8080::rlca(self),                               // rlca
-                0x17 => i8080::math::ral(self),                          // rla
+                0x17 => z8080::rla(self),                                // rla
                 0x27 => z8080::daa(self),                                // daa
                 0x37 => z8080::scf(self),                                // sfc
                 // add hl, bc
