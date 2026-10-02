@@ -103,7 +103,7 @@ pub enum InterruptMode {
 }
 
 /// Function that handles receiving input and finishing the IN instruction
-pub(super) type InputContinuation = fn(&mut Emulator, u8);
+pub(super) type InputContinuation = fn(&mut Emulator, &mut dyn Memory, u8);
 
 impl Emulator {
     /// Create a Z80 emulator
@@ -615,7 +615,7 @@ impl EmulatorCore for Emulator {
                     self.mem_ptr.0 = self.a.0 as u16;
                     self.mem_ptr += port;
                     self.mem_ptr += 1;
-                    self.input_continuation = Some(|emu, input| emu.a.0 = input);
+                    self.input_continuation = Some(|emu, _, input| emu.a.0 = input);
                     break 'main (11, ExecEffect::In { port });
                 }
                 0xeb => i8080::load::xchg(self), // XCHG
@@ -967,9 +967,9 @@ impl I8080FamilyEmulator for Emulator {
         self.mem_ptr.0 = address
     }
 
-    fn input(&mut self, value: u8) {
+    fn input(&mut self, memory: &mut dyn Memory, value: u8) {
         if let Some(cont) = self.input_continuation {
-            cont(self, value);
+            cont(self, memory, value);
             self.input_continuation = None;
         }
     }

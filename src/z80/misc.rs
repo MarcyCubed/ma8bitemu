@@ -3,7 +3,7 @@
 use crate::i8080::I8080FamilyEmulator;
 use crate::i8080::load::{lhld_rr, shld_rr};
 use crate::memory::Memory;
-use crate::z80::emulator::InterruptMode;
+use crate::z80::emulator::{InputContinuation, InterruptMode};
 use crate::z80::z8080::double_add_flags;
 use crate::z80::{Emulator, z8080};
 use crate::{ExecEffect, i8080};
@@ -11,7 +11,7 @@ use std::num::Wrapping;
 
 macro_rules! in_r_bc {
     ($emulator:ident, $body:expr) => {{
-        $emulator.input_continuation = Some(|emu, input| {
+        $emulator.input_continuation = Some(|emu, _, input| {
             $body(emu, input);
             emu.nf = false;
             emu.hf = false;
@@ -20,6 +20,56 @@ macro_rules! in_r_bc {
         });
         (
             12,
+            ExecEffect::In {
+                port: $emulator.get_bc(),
+            },
+        )
+    }};
+}
+
+/// Input continuation for INI and IND
+macro_rules! inx_continuation {
+    ($offset: literal) => {
+        |emulator, memory, input| {
+            let hl = emulator.get_hl();
+            memory.store(hl, input);
+            emulator.set_hl(hl.wrapping_add_signed($offset));
+            emulator.b -= 1;
+            emulator.nf = true;
+            emulator.zf = emulator.b.0 == 0;
+            emulator.mem_ptr.0 = emulator.get_bc();
+            emulator.mem_ptr += 1;
+        }
+    };
+}
+
+/// INI and IND
+macro_rules! inx {
+    ($emulator: ident, $offset: literal) => {{
+        $emulator.input_continuation = Some(inx_continuation!($offset));
+        (
+            16,
+            ExecEffect::In {
+                port: $emulator.get_bc(),
+            },
+        )
+    }};
+}
+
+/// INIR and INDR
+macro_rules! inxr {
+    ($emulator: ident, $offset: literal) => {{
+        // inir
+        $emulator.input_continuation = Some(|emulator, memory, input| {
+            let inx_cont: InputContinuation = inx_continuation!($offset);
+            inx_cont(emulator, memory, input);
+            if !emulator.zf {
+                emulator.pc -= 2;
+            }
+        });
+
+        (
+            if $emulator.b.0 == 1 { 16 } else { 21 },
             ExecEffect::In {
                 port: $emulator.get_bc(),
             },
@@ -142,20 +192,22 @@ pub(super) fn run_opcode(
             i8080::jump::ret(emulator, memory);
             (14, ExecEffect::Normal)
         }
-        0xa0 => ldx(emulator, memory, 1),   // ldi
-        0xa8 => ldx(emulator, memory, -1),  // ldd
-        0xb0 => ldxr(emulator, memory, 1),  // ldir
-        0xb8 => ldxr(emulator, memory, -1), // lddr
-        0xa1 => cpx(emulator, memory, 1),   // cpi
-        0xa9 => cpx(emulator, memory, -1),  // cpd
-        0xb1 => cpxr(emulator, memory, 1),  // cpir
-        0xb9 => cpxr(emulator, memory, -1), // cpdr
-        0xa2 | 0xaa | 0xb2 | 0xba => todo!("Input needs to be reworked"),
-        0xa3 => outx(emulator, memory, 1),  // outi
-        0xab => outx(emulator, memory, -1), // outd
-        0xb3 => repeat(outx, |s| s.zf, emulator, memory, 1), // otir
+        0xa0 => ldx(emulator, memory, 1),                     // ldi
+        0xa8 => ldx(emulator, memory, -1),                    // ldd
+        0xb0 => ldxr(emulator, memory, 1),                    // ldir
+        0xb8 => ldxr(emulator, memory, -1),                   // lddr
+        0xa1 => cpx(emulator, memory, 1),                     // cpi
+        0xa9 => cpx(emulator, memory, -1),                    // cpd
+        0xb1 => cpxr(emulator, memory, 1),                    // cpir
+        0xb9 => cpxr(emulator, memory, -1),                   // cpdr
+        0xa3 => outx(emulator, memory, 1),                    // outi
+        0xab => outx(emulator, memory, -1),                   // outd
+        0xb3 => repeat(outx, |s| s.zf, emulator, memory, 1),  // otir
         0xbb => repeat(outx, |s| s.zf, emulator, memory, -1), // otdr
-
+        0xa2 => inx!(emulator, 1),                            // ini
+        0xaa => inx!(emulator, -1),                           // ind
+        0xb2 => inxr!(emulator, 1),                           // inir
+        0xba => inxr!(emulator, -1),                          // indr
         // NOP is the default
         _ => (8, ExecEffect::Normal),
     }
