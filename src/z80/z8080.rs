@@ -1,7 +1,7 @@
 //! 8080 instructions that work differently in the Z80
 
 use crate::i8080::I8080FamilyEmulator;
-use crate::i8080::math::{add_value, check_carry};
+use crate::i8080::math::check_carry;
 use crate::memory::Memory;
 use crate::z80::Emulator;
 use core::num::Wrapping;
@@ -72,26 +72,28 @@ pub(super) fn dec_mem(
 /// Adjust a BCD value after a math operation
 ///
 /// Return the number of clock cycles it takes to execute the instruction
-pub(super) fn daa(state: &mut Emulator) -> u8 {
-    let a = state.a.0;
+pub(super) fn daa(emulator: &mut Emulator) -> u8 {
+    let a = emulator.a.0;
 
     let mut diff = 0;
-    if state.hf || a & 0x0f > 9 {
+    if emulator.hf || a & 0x0f > 9 {
         diff = 0x06;
     }
-    if state.cf || a > 0x99 {
+    if emulator.cf || a > 0x99 {
         diff += 0x60;
+        emulator.cf = true;
     }
 
-    let carry = state.cf;
-    if state.nf {
-        sub_value(state, diff, false);
+    if emulator.nf {
+        emulator.hf = emulator.hf && (a & 0x0F) < 0x06;
+        emulator.a -= diff;
     } else {
-        add_value(state, diff, false);
+        emulator.hf = (a & 0x0F) > 0x09;
+        emulator.a += diff;
     };
-    state.cf |= carry;
 
-    state.parity_from_accumulator();
+    emulator.flags_from_accumulator();
+    emulator.parity_from_accumulator();
     4
 }
 
