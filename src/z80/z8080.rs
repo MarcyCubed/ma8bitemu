@@ -195,6 +195,7 @@ pub(super) fn rla(emulator: &mut Emulator) -> u8 {
     i8080::math::ral(emulator);
     emulator.nf = false;
     emulator.hf = false;
+    emulator.xy_from_accumulator();
     4
 }
 
@@ -203,5 +204,6 @@ pub(super) fn rra(emulator: &mut Emulator) -> u8 {
     i8080::math::rar(emulator);
     emulator.nf = false;
     emulator.hf = false;
+    emulator.xy_from_accumulator();
     4
 }
