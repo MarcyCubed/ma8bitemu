@@ -382,7 +382,7 @@ pub(super) fn run_opcode(emulator: &mut Emulator, opcode: u8, memory: &mut impl 
         0xa4 => res_r!(4, emulator, h),
         0xa5 => res_r!(4, emulator, l),
         0xa7 => res_r!(4, emulator, a),
-        0xa6 => bit_mem!(4, emulator, memory),
+        0xa6 => res_mem!(4, emulator, memory),
         // res 5, r
         0xa8 => res_r!(5, emulator, b),
         0xa9 => res_r!(5, emulator, c),
