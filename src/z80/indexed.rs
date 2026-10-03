@@ -371,6 +371,7 @@ pub(super) fn run_opcode<I: IndexRegister>(
         // jp (iz)
         0xe9 => {
             emulator.pc = I::get(emulator);
+            emulator.mem_ptr = emulator.pc;
             8
         }
         // ld sp, ix

@@ -674,10 +674,11 @@ impl EmulatorCore for Emulator {
                 0x10 => {
                     let d = self.fetch_byte(memory);
                     self.b -= 1;
+                    self.mem_ptr.0 = self.pc.0.wrapping_add_signed(d as i8 as i16);
                     if self.b.0 == 0 {
                         8
                     } else {
-                        self.pc += d as u16;
+                        self.pc = self.mem_ptr;
                         11
                     }
                 }
