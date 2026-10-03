@@ -107,7 +107,7 @@ impl<E: I8080FamilyEmulator> CpmRunner<E> {
                     break;
                 }
                 ExecEffect::Out { port, .. } => {
-                    if port == 0 {
+                    if port & 0xff == 0 {
                         println!();
                         println!("Finished execution");
                         break;
