@@ -1,6 +1,7 @@
 //! The core of the Z80 emulator
 
 use crate::i8080::I8080FamilyEmulator;
+use crate::i8080::jump::push_stack;
 use crate::memory::Memory;
 use crate::z80::{bits, indexed, misc, z8080};
 use crate::{EmulatorCore, ExecEffect, Fetch, i8080};
@@ -212,6 +213,11 @@ impl Emulator {
         self.r &= !MASK;
         self.r |= msb;
     }
+
+    /// Trigger a non-masking Interrupt
+    pub fn non_masking_interrupt(&mut self) {
+        self.nmi_pending = true;
+    }
 }
 
 /// Implement the instruction `sub r`
@@ -252,6 +258,35 @@ macro_rules! cp_r {
 }
 
 impl EmulatorCore for Emulator {
+    fn next_instruction(&mut self, memory: &mut impl Memory) -> u8 {
+        if self.nmi_pending {
+            // NMI
+            self.nmi_pending = false;
+            self.iff1 = false;
+            push_stack(self, memory, self.pc.0);
+            self.pc.0 = 0x66;
+            self.inc_r();
+            self.fetch_byte(memory)
+        } else if let Some(vector) = self.interrupt_vector
+            && self.iff1
+            && self.last_effect != ExecEffect::InterruptDelay
+        {
+            // Normal Interrupt
+            match self.interrupt_mode {
+                InterruptMode::I8080 => vector,
+                InterruptMode::Rst38h => 0xff,
+                InterruptMode::Vectored => {
+                    push_stack(self, memory, self.pc.0);
+                    self.pc.0 = memory.load_16(u16::from_le_bytes([vector, self.i]));
+                    self.fetch_byte(memory)
+                }
+            }
+        } else {
+            // No interrupts
+            self.fetch_byte(memory)
+        }
+    }
+
     fn run_opcode(&mut self, opcode: u8, memory: &mut impl Memory) -> (u8, ExecEffect) {
         // Increase the R register
         self.inc_r();
@@ -974,7 +1009,7 @@ impl I8080FamilyEmulator for Emulator {
         }
     }
 
-    fn interrupt(&mut self, _vector: u8) {
-        todo!()
+    fn interrupt(&mut self, vector: u8) {
+        self.interrupt_vector = Some(vector);
     }
 }

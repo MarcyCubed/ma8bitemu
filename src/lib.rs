@@ -30,7 +30,7 @@ pub trait EmulatorCore: Fetch {
     ///
     /// Reimplement this if you need something more complex than fetching the next instruction, like
     /// executing an instruction that's not in memory as 8080 interrupts do.
-    fn next_instruction(&mut self, memory: &impl Memory) -> u8 {
+    fn next_instruction(&mut self, memory: &mut impl Memory) -> u8 {
         self.fetch_byte(memory)
     }
 

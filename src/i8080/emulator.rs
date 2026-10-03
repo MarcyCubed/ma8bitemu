@@ -71,7 +71,7 @@ impl Emulator {
 
 impl crate::EmulatorCore for Emulator {
     /// Get the next instruction
-    fn next_instruction(&mut self, memory: &impl Memory) -> u8 {
+    fn next_instruction(&mut self, memory: &mut impl Memory) -> u8 {
         // If we can and should trigger an interrupt...
         if let Some(vector) = self.interrupt_vector
             && self.inte
