@@ -1,4 +1,4 @@
-use crate::i8080::{I8080FamilyEmulator, jump};
+use crate::i8080::I8080FamilyEmulator;
 use crate::memory::Memory;
 use core::num::Wrapping;
 
@@ -138,14 +138,13 @@ pub(crate) fn mov_mem_r<S: I8080FamilyEmulator>(
 
 /// Exchanges HL with the top of the stack
 pub(crate) fn xthl(
-    state: &mut impl I8080FamilyEmulator,
+    emulator: &mut impl I8080FamilyEmulator,
     memory: &mut impl Memory,
     clock_cycles: u8,
 ) -> u8 {
-    let popped = jump::pop_stack(state, memory);
-    let hl = state.get_hl();
-    jump::push_stack(state, memory, hl);
-    state.set_hl(popped);
+    let sp_data = memory.load_16(emulator.get_sp().0);
+    memory.store_16(emulator.get_sp().0, emulator.get_hl());
+    emulator.set_hl(sp_data);
     clock_cycles
 }
 

@@ -1,7 +1,7 @@
 //! The core of the Z80 emulator
 
 use crate::i8080::I8080FamilyEmulator;
-use crate::i8080::jump::push_stack;
+use crate::i8080::jump::call_address;
 use crate::memory::Memory;
 use crate::z80::{bits, indexed, misc, z8080};
 use crate::{EmulatorCore, ExecEffect, Fetch, i8080};
@@ -263,8 +263,7 @@ impl EmulatorCore for Emulator {
             // NMI
             self.nmi_pending = false;
             self.iff1 = false;
-            push_stack(self, memory, self.pc.0);
-            self.pc.0 = 0x66;
+            call_address(self, memory, 0x66);
             self.inc_r();
             self.fetch_byte(memory)
         } else if let Some(vector) = self.interrupt_vector
@@ -276,8 +275,8 @@ impl EmulatorCore for Emulator {
                 InterruptMode::I8080 => vector,
                 InterruptMode::Rst38h => 0xff,
                 InterruptMode::Vectored => {
-                    push_stack(self, memory, self.pc.0);
-                    self.pc.0 = memory.load_16(u16::from_le_bytes([vector, self.i]));
+                    let address = memory.load_16(u16::from_le_bytes([vector, self.i]));
+                    call_address(self, memory, address);
                     self.fetch_byte(memory)
                 }
             }
