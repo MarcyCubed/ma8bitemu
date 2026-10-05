@@ -6,7 +6,7 @@ use crate::memory::Memory;
 use crate::z80::{bits, indexed, misc, z8080};
 use crate::{EmulatorCore, ExecEffect, Fetch, i8080};
 use core::mem;
-use std::num::Wrapping;
+use core::num::Wrapping;
 
 /// The Z80 emulator
 #[derive(Debug, Clone, Copy)]

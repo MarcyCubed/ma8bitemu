@@ -7,7 +7,7 @@ use crate::memory::Memory;
 use crate::z80::z8080::{and_value, cp_value, dec_flags, sub_value};
 use crate::z80::{Emulator, double_prefix, z8080};
 use crate::{ExecEffect, Fetch};
-use std::num::Wrapping;
+use core::num::Wrapping;
 
 /// A trait to abstract away IX and IY registers.
 pub(super) trait IndexRegister {

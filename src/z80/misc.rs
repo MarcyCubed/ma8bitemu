@@ -7,7 +7,7 @@ use crate::z80::emulator::{InputContinuation, InterruptMode};
 use crate::z80::z8080::double_add_flags;
 use crate::z80::{Emulator, z8080};
 use crate::{ExecEffect, i8080};
-use std::num::Wrapping;
+use core::num::Wrapping;
 
 macro_rules! in_r_bc {
     ($emulator:ident, $body:expr) => {{

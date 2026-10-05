@@ -3,7 +3,7 @@
 use crate::ExecEffect;
 use crate::i8080::{Fetch, I8080FamilyEmulator, jump, load, math};
 use crate::memory::Memory;
-use std::num::Wrapping;
+use core::num::Wrapping;
 
 /// The 8080 emulator
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
