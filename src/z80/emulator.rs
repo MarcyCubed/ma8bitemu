@@ -1009,7 +1009,12 @@ impl I8080FamilyEmulator for Emulator {
         }
     }
 
-    fn interrupt(&mut self, vector: u8) {
+    fn interrupt(&mut self, vector: u8) -> u8 {
         self.interrupt_vector = Some(vector);
+        match self.interrupt_mode {
+            InterruptMode::I8080 => 11,
+            InterruptMode::Rst38h => 13,
+            InterruptMode::Vectored => 19,
+        }
     }
 }

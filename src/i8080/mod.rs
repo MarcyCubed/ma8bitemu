@@ -224,8 +224,10 @@ pub trait I8080FamilyEmulator: EmulatorCore {
     /// Give the emulator an input requested by the IN instruction
     fn input(&mut self, memory: &mut dyn Memory, value: u8);
 
-    /// Cause an interrupt
-    fn interrupt(&mut self, vector: u8);
+    /// Request an interrupt to be serviced
+    ///
+    /// Return the number of clock cycles it takes to trigger the interrupt
+    fn interrupt(&mut self, vector: u8) -> u8;
 }
 
 impl<T: I8080FamilyEmulator> Fetch for T {
