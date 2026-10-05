@@ -54,7 +54,7 @@ pub trait EmulatorCore: Fetch {
     /// Run a program until it exceeds the number of clock cycles, halts or performs I/O
     ///
     /// Return the number of clock cycles it took to execute the program and the result of the execution
-    fn run_limited_clock(&mut self, memory: &mut impl Memory, limit: usize) -> (usize, ExecEffect) {
+    fn run_limited_clock(&mut self, memory: &mut impl Memory, limit: u64) -> (u64, ExecEffect) {
         let mut clock_cycles = 0;
 
         let result = loop {
@@ -63,7 +63,7 @@ pub trait EmulatorCore: Fetch {
             }
 
             let (cycles, result) = self.step(memory);
-            clock_cycles += cycles as usize;
+            clock_cycles += cycles as u64;
             match result {
                 ExecEffect::Normal | ExecEffect::InterruptDelay => continue,
                 result => break result,
@@ -78,12 +78,12 @@ pub trait EmulatorCore: Fetch {
     /// Return the number of clock cycles it took to execute the program and the result of the execution.
     ///
     /// Since this function only stops when the program needs data or halts, it may loop forever.
-    fn run(&mut self, memory: &mut impl Memory) -> (usize, ExecEffect) {
+    fn run(&mut self, memory: &mut impl Memory) -> (u64, ExecEffect) {
         let mut clock_cycles = 0;
 
         loop {
             let (cycles, result) = self.step(memory);
-            clock_cycles += cycles as usize;
+            clock_cycles += cycles as u64;
             match result {
                 ExecEffect::Normal | ExecEffect::InterruptDelay => continue,
                 result => return (clock_cycles, result),

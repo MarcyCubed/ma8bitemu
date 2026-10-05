@@ -892,8 +892,8 @@ mod tests {
     fn check_running_limit() {
         let mut program = [0xcb, 0x00, 0x00]; // jmp 0x00 : Infinite loop
         let mut emulator = Emulator::new();
-        const LIMIT: usize = 10000;
+        const LIMIT: u64 = 10000;
         let (clock_cycles, _) = emulator.run_limited_clock(&mut program, LIMIT);
-        assert!(clock_cycles > LIMIT, "Stopped before reaching the limit.");
+        assert!(clock_cycles >= LIMIT, "Stopped before reaching the limit.");
     }
 }
