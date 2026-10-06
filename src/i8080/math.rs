@@ -9,10 +9,11 @@ pub(crate) fn inx<E: I8080FamilyEmulator>(
     emulator: &mut E,
     getter: fn(&E) -> u16,
     setter: fn(&mut E, u16),
+    clock_cycles: u8,
 ) -> u8 {
     let inc = getter(emulator).wrapping_add(1);
     setter(emulator, inc);
-    5
+    clock_cycles
 }
 
 /// Decrement a 16-bit register
@@ -20,10 +21,11 @@ pub(crate) fn dcx<E: I8080FamilyEmulator>(
     emulator: &mut E,
     getter: fn(&E) -> u16,
     setter: fn(&mut E, u16),
+    clock_cycles: u8,
 ) -> u8 {
     let inc = getter(emulator).wrapping_sub(1);
     setter(emulator, inc);
-    5
+    clock_cycles
 }
 
 /// Increment a register and set the appropriate flags
@@ -31,11 +33,12 @@ pub(crate) fn dcx<E: I8080FamilyEmulator>(
 pub(crate) fn inc<E: I8080FamilyEmulator>(
     emulator: &mut E,
     get_register: impl Fn(&mut E) -> &mut Wrapping<u8>,
+    clock_cycles: u8,
 ) -> u8 {
     let old_value = *get_register(emulator);
     let new_value = inc_value(emulator, old_value);
     *get_register(emulator) = new_value;
-    5
+    clock_cycles
 }
 
 /// Increment a value and set the appropriate flags.
@@ -56,11 +59,15 @@ pub(crate) fn inc_value(
 }
 
 /// Increments the value in memory pointed by HL
-pub(crate) fn inc_mem<E: I8080FamilyEmulator>(emulator: &mut E, memory: &mut impl Memory) -> u8 {
+pub(crate) fn inc_mem<E: I8080FamilyEmulator>(
+    emulator: &mut E,
+    memory: &mut impl Memory,
+    clock_cycles: u8,
+) -> u8 {
     let address = emulator.get_hl();
     let value = inc_value(emulator, Wrapping(memory.load(address)));
     memory.store(address, value.0);
-    10
+    clock_cycles
 }
 
 /// Decrement a register and set the appropriate flags

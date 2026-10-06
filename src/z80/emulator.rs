@@ -306,18 +306,18 @@ impl EmulatorCore for Emulator {
                 0x12 => i8080::load::stax(self, memory, |e| e.get_de()), // ld (de), a
                 0x22 => i8080::load::shld_rr(self, memory, Self::get_hl), // ld (nn), hl
                 0x32 => i8080::load::sta(self, memory),                  // ld (nn), a
-                0x03 => i8080::math::inx(self, Self::get_bc, Self::set_bc), // inc bc
-                0x13 => i8080::math::inx(self, Self::get_de, Self::set_de), // inc de
-                0x23 => i8080::math::inx(self, Self::get_hl, Self::set_hl), // inc HL
-                0x33 => i8080::math::inx(self, Self::get_sp_u16, Self::set_sp), // inc sp
-                0x04 => i8080::math::inc(self, |e| &mut e.b),            // inc b
-                0x14 => i8080::math::inc(self, |e| &mut e.d),            // inc d
-                0x24 => i8080::math::inc(self, |e| &mut e.h),            // inc h
-                0x0c => i8080::math::inc(self, |e| &mut e.c),            // inc c
-                0x1c => i8080::math::inc(self, |e| &mut e.e),            // inc e
-                0x2c => i8080::math::inc(self, |e| &mut e.l),            // inc l
-                0x3c => i8080::math::inc(self, |e| &mut e.a),            // inc a
-                0x34 => i8080::math::inc_mem(self, memory),              // inc (HL)
+                0x03 => i8080::math::inx(self, Self::get_bc, Self::set_bc, 6), // inc bc
+                0x13 => i8080::math::inx(self, Self::get_de, Self::set_de, 6), // inc de
+                0x23 => i8080::math::inx(self, Self::get_hl, Self::set_hl, 6), // inc HL
+                0x33 => i8080::math::inx(self, Self::get_sp_u16, Self::set_sp, 6), // inc sp
+                0x04 => i8080::math::inc(self, |e| &mut e.b, 4),         // inc b
+                0x14 => i8080::math::inc(self, |e| &mut e.d, 4),         // inc d
+                0x24 => i8080::math::inc(self, |e| &mut e.h, 4),         // inc h
+                0x0c => i8080::math::inc(self, |e| &mut e.c, 4),         // inc c
+                0x1c => i8080::math::inc(self, |e| &mut e.e, 4),         // inc e
+                0x2c => i8080::math::inc(self, |e| &mut e.l, 4),         // inc l
+                0x3c => i8080::math::inc(self, |e| &mut e.a, 4),         // inc a
+                0x34 => i8080::math::inc_mem(self, memory, 11),          // inc (HL)
                 0x05 => z8080::dec_r(self, |e| &mut e.b),                // dec b
                 0x15 => z8080::dec_r(self, |e| &mut e.d),                // dec d
                 0x25 => z8080::dec_r(self, |e| &mut e.h),                // dec h
@@ -374,10 +374,10 @@ impl EmulatorCore for Emulator {
                 0x1a => i8080::load::ldax(self, memory, Self::get_de), // ld a, (de)
                 0x2a => i8080::load::lhld_rr(self, memory, Self::set_hl), // ld hl, (nn)
                 0x3a => i8080::load::lda(self, memory),                // ld a, (nn)
-                0x0b => i8080::math::dcx(self, Self::get_bc, Self::set_bc), // dec bc
-                0x1b => i8080::math::dcx(self, Self::get_de, Self::set_de), // dec de
-                0x2b => i8080::math::dcx(self, Self::get_hl, Self::set_hl), // dec hl
-                0x3b => i8080::math::dcx(self, Self::get_sp_u16, Self::set_sp), // dec sp
+                0x0b => i8080::math::dcx(self, Self::get_bc, Self::set_bc, 6), // dec bc
+                0x1b => i8080::math::dcx(self, Self::get_de, Self::set_de, 6), // dec de
+                0x2b => i8080::math::dcx(self, Self::get_hl, Self::set_hl, 6), // dec hl
+                0x3b => i8080::math::dcx(self, Self::get_sp_u16, Self::set_sp, 6), // dec sp
                 0x0f => z8080::rrca(self),                             // rrca
                 0x1f => z8080::rra(self),                              // rra
                 0x2f => z8080::cpl(self),                              // cpl
@@ -678,7 +678,7 @@ impl EmulatorCore for Emulator {
                         8
                     } else {
                         self.pc = self.mem_ptr;
-                        11
+                        13
                     }
                 }
                 0x18 => self.jr(|_| true, memory),  // jr d

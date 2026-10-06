@@ -209,7 +209,7 @@ pub(super) fn run_opcode(
         0xb2 => inxr!(emulator, 1),                           // inir
         0xba => inxr!(emulator, -1),                          // indr
         // NOP is the default
-        _ => (8, ExecEffect::Normal),
+        _ => (4, ExecEffect::Normal),
     }
 }
 

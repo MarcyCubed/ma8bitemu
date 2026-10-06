@@ -100,7 +100,7 @@ pub(crate) fn lda(state: &mut impl I8080FamilyEmulator, memory: &mut impl Memory
     let address = state.fetch_word(memory);
     state.set_memptr(address.wrapping_add(1));
     state.get_a_mut().0 = memory.load(address);
-    16
+    13
 }
 
 /// Move the value in the source register to the destination register

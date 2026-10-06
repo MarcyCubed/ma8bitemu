@@ -110,29 +110,29 @@ impl crate::EmulatorCore for Emulator {
                 // STA a16
                 0x32 => load::sta(self, memory),
                 // INX B
-                0x03 => math::inx(self, Self::get_bc, Self::set_bc),
+                0x03 => math::inx(self, Self::get_bc, Self::set_bc, 5),
                 // INX D
-                0x13 => math::inx(self, Self::get_de, Self::set_de),
+                0x13 => math::inx(self, Self::get_de, Self::set_de, 5),
                 // INX H
-                0x23 => math::inx(self, Self::get_hl, Self::set_hl),
+                0x23 => math::inx(self, Self::get_hl, Self::set_hl, 5),
                 // INX SP
-                0x33 => math::inx(self, Self::get_sp_u16, Self::set_sp),
+                0x33 => math::inx(self, Self::get_sp_u16, Self::set_sp, 5),
                 // INR B
-                0x04 => math::inc(self, |s| &mut s.b),
+                0x04 => math::inc(self, |s| &mut s.b, 5),
                 // INR D
-                0x14 => math::inc(self, |s| &mut s.d),
+                0x14 => math::inc(self, |s| &mut s.d, 5),
                 // INR H
-                0x24 => math::inc(self, |s| &mut s.h),
+                0x24 => math::inc(self, |s| &mut s.h, 5),
                 // INR C
-                0x0c => math::inc(self, |s| &mut s.c),
+                0x0c => math::inc(self, |s| &mut s.c, 5),
                 // INR E
-                0x1c => math::inc(self, |s| &mut s.e),
+                0x1c => math::inc(self, |s| &mut s.e, 5),
                 // INR L
-                0x2c => math::inc(self, |s| &mut s.l),
+                0x2c => math::inc(self, |s| &mut s.l, 5),
                 // INR A
-                0x3c => math::inc(self, |s| &mut s.a),
+                0x3c => math::inc(self, |s| &mut s.a, 5),
                 // INR M
-                0x34 => math::inc_mem(self, memory),
+                0x34 => math::inc_mem(self, memory, 10),
                 // DCR B
                 0x05 => math::dec(self, |s| &mut s.b),
                 // DCR D
@@ -190,13 +190,13 @@ impl crate::EmulatorCore for Emulator {
                 // LDA a16
                 0x3a => load::lda(self, memory),
                 // DCX B
-                0x0b => math::dcx(self, Self::get_bc, Self::set_bc),
+                0x0b => math::dcx(self, Self::get_bc, Self::set_bc, 5),
                 // DCX D
-                0x1b => math::dcx(self, Self::get_de, Self::set_de),
+                0x1b => math::dcx(self, Self::get_de, Self::set_de, 5),
                 // DCX H
-                0x2b => math::dcx(self, Self::get_hl, Self::set_hl),
+                0x2b => math::dcx(self, Self::get_hl, Self::set_hl, 5),
                 // DCX SP
-                0x3b => math::dcx(self, Self::get_sp_u16, Self::set_sp),
+                0x3b => math::dcx(self, Self::get_sp_u16, Self::set_sp, 5),
                 // RRC
                 0x0f => math::rrc(self),
                 // RAR

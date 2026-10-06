@@ -23,6 +23,14 @@ pub trait Memory {
     }
 }
 
+/// ROM with a single value
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct Constant(pub u8);
+
+/// ROM with a repeating value
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct Repeat<const N: usize>(pub [u8; N]);
+
 impl<const N: usize> Memory for [u8; N] {
     fn load(&self, address: u16) -> u8 {
         self[address as usize]
@@ -40,5 +48,26 @@ impl Memory for [u8] {
 
     fn store(&mut self, address: u16, data: u8) {
         self[address as usize] = data;
+    }
+}
+
+impl Memory for Constant {
+    fn load(&self, _address: u16) -> u8 {
+        self.0
+    }
+
+    fn store(&mut self, _address: u16, _data: u8) {
+        // Do nothing
+    }
+}
+
+impl<const N: usize> Memory for Repeat<N> {
+    fn load(&self, address: u16) -> u8 {
+        let address = address as usize % N;
+        self.0[address]
+    }
+
+    fn store(&mut self, _address: u16, _data: u8) {
+        // Do nothing
     }
 }
