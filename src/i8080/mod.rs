@@ -222,7 +222,7 @@ pub trait I8080FamilyEmulator: EmulatorCore {
     fn set_memptr(&mut self, address: u16);
 
     /// Give the emulator an input requested by the IN instruction
-    fn input(&mut self, memory: &mut dyn Memory, value: u8);
+    fn input(&mut self, value: u8);
 
     /// Request an interrupt to be serviced
     ///

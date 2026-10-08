@@ -282,18 +282,20 @@ fn test_z80_bc_dec_jump() {
 fn test_z80_inir_indr() {
     for opcode in [0xb2, 0xba] {
         let mut emulator = z80::Emulator::new();
-        let mut memory = memory::Repeat([0xed, opcode]);
+        // Initialize memory with NOP so the test will fail if it runs bad memory
+        let mut memory = [0; 0x10000];
+        memory[0] = 0xed;
+        memory[1] = opcode;
         emulator.b.0 = 2;
+        emulator.set_hl(0x200); // HL needs to point away from the code
         let cycles = emulator.step(&mut memory).0;
         assert_eq!(
             21, cycles,
             "Wrong number of clock cycles on instruction: {opcode:02x}h clock cycles:{cycles:?}"
         );
-        emulator.input(&mut memory, 0xff);
-        // Check if it's looping right and running the same instruction
-        assert_eq!(0, emulator.pc.0);
+        emulator.input(0xff);
         let cycles = emulator.step(&mut memory).0;
-        emulator.input(&mut memory, 0xff);
+        emulator.input(0xff);
         assert_eq!(
             16, cycles,
             "Wrong number of clock cycles on instruction: {opcode:02x}h clock cycles:{cycles:?}"
@@ -312,11 +314,11 @@ fn test_z80_djnz() {
         13, cycles,
         "Wrong number of clock cycles on DJNZ (10h). clock cycles:{cycles:?}"
     );
-    emulator.input(&mut memory, 0xff);
+    emulator.input(0xff);
     // Reset the PC
     emulator.pc.0 = 0;
     let cycles = emulator.step(&mut memory).0;
-    emulator.input(&mut memory, 0xff);
+    emulator.input(0xff);
     assert_eq!(
         8, cycles,
         "Wrong number of clock cycles on DJNZ (10h). clock cycles:{cycles:?}"

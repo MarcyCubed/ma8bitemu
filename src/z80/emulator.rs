@@ -85,6 +85,8 @@ pub struct Emulator {
     nmi_pending: bool,
     /// The input continuation
     pub(super) input_continuation: Option<InputContinuation>,
+    /// The value sent as input
+    input_value: u8,
 }
 
 /// How the processor handles interruptions
@@ -147,6 +149,7 @@ impl Emulator {
             interrupt_vector: None,
             nmi_pending: false,
             input_continuation: None,
+            input_value: 0,
         }
     }
 
@@ -259,6 +262,12 @@ macro_rules! cp_r {
 
 impl EmulatorCore for Emulator {
     fn next_instruction(&mut self, memory: &mut impl Memory) -> u8 {
+        // Check if there's pending input to handle
+        // It's done here because it can change the PC
+        if let Some(cont) = self.input_continuation {
+            cont(self, memory, self.input_value);
+            self.input_continuation = None;
+        }
         if self.nmi_pending {
             // NMI
             self.nmi_pending = false;
@@ -289,7 +298,6 @@ impl EmulatorCore for Emulator {
     fn run_opcode(&mut self, opcode: u8, memory: &mut impl Memory) -> (u8, ExecEffect) {
         // Increase the R register
         self.inc_r();
-        self.input_continuation = None;
         // Execute the instruction
         let result = 'main: {
             let clock_cycles = match opcode {
@@ -1002,11 +1010,8 @@ impl I8080FamilyEmulator for Emulator {
         self.mem_ptr.0 = address
     }
 
-    fn input(&mut self, memory: &mut dyn Memory, value: u8) {
-        if let Some(cont) = self.input_continuation {
-            cont(self, memory, value);
-            self.input_continuation = None;
-        }
+    fn input(&mut self, value: u8) {
+        self.input_value = value;
     }
 
     fn interrupt(&mut self, vector: u8) -> u8 {

@@ -690,7 +690,7 @@ impl I8080FamilyEmulator for Emulator {
         // Nothing to do
     }
 
-    fn input(&mut self, _: &mut dyn Memory, value: u8) {
+    fn input(&mut self, value: u8) {
         self.a.0 = value
     }
 

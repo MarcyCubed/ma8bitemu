@@ -3,7 +3,7 @@
 use crate::i8080::I8080FamilyEmulator;
 use crate::i8080::load::{lhld_rr, shld_rr};
 use crate::memory::Memory;
-use crate::z80::emulator::{InputContinuation, InterruptMode};
+use crate::z80::emulator::InterruptMode;
 use crate::z80::z8080::double_add_flags;
 use crate::z80::{Emulator, z8080};
 use crate::{ExecEffect, i8080};
@@ -27,54 +27,23 @@ macro_rules! in_r_bc {
     }};
 }
 
+/// Body of an INI/IND inout continuation
+fn inx_continuation_body(emulator: &mut Emulator, memory: &mut dyn Memory, input: u8, offset: i16) {
+    let hl = emulator.get_hl();
+    memory.store(hl, input);
+    emulator.set_hl(hl.wrapping_add_signed(offset));
+    emulator.b -= 1;
+    emulator.nf = true;
+    emulator.zf = emulator.b.0 == 0;
+    emulator.mem_ptr.0 = emulator.get_bc();
+    emulator.mem_ptr += 1;
+}
+
 /// Input continuation for INI and IND
 macro_rules! inx_continuation {
     ($offset: literal) => {
-        |emulator, memory, input| {
-            let hl = emulator.get_hl();
-            memory.store(hl, input);
-            emulator.set_hl(hl.wrapping_add_signed($offset));
-            emulator.b -= 1;
-            emulator.nf = true;
-            emulator.zf = emulator.b.0 == 0;
-            emulator.mem_ptr.0 = emulator.get_bc();
-            emulator.mem_ptr += 1;
-        }
+        |emulator, memory, input| inx_continuation_body(emulator, memory, input, $offset)
     };
-}
-
-/// INI and IND
-macro_rules! inx {
-    ($emulator: ident, $offset: literal) => {{
-        $emulator.input_continuation = Some(inx_continuation!($offset));
-        (
-            16,
-            ExecEffect::In {
-                port: $emulator.get_bc(),
-            },
-        )
-    }};
-}
-
-/// INIR and INDR
-macro_rules! inxr {
-    ($emulator: ident, $offset: literal) => {{
-        // inir
-        $emulator.input_continuation = Some(|emulator, memory, input| {
-            let inx_cont: InputContinuation = inx_continuation!($offset);
-            inx_cont(emulator, memory, input);
-            if !emulator.zf {
-                emulator.pc -= 2;
-            }
-        });
-
-        (
-            if $emulator.b.0 == 1 { 16 } else { 21 },
-            ExecEffect::In {
-                port: $emulator.get_bc(),
-            },
-        )
-    }};
 }
 
 /// Execute a prefix ED instruction
@@ -204,10 +173,10 @@ pub(super) fn run_opcode(
         0xab => outx(emulator, memory, -1),                   // outd
         0xb3 => repeat(outx, |s| s.zf, emulator, memory, 1),  // otir
         0xbb => repeat(outx, |s| s.zf, emulator, memory, -1), // otdr
-        0xa2 => inx!(emulator, 1),                            // ini
-        0xaa => inx!(emulator, -1),                           // ind
-        0xb2 => inxr!(emulator, 1),                           // inir
-        0xba => inxr!(emulator, -1),                          // indr
+        0xa2 => inx(emulator, true),                          // ini
+        0xaa => inx(emulator, false),                         // ind
+        0xb2 => inxr(emulator, true),                         // inir
+        0xba => inxr(emulator, false),                        // indr
         // NOP is the default
         _ => (4, ExecEffect::Normal),
     }
@@ -389,6 +358,32 @@ fn cpxr(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, 
         },
         ExecEffect::Normal,
     )
+}
+
+/// INI and IND
+fn inx(emulator: &mut Emulator, increment: bool) -> (u8, ExecEffect) {
+    emulator.input_continuation = if increment {
+        Some(inx_continuation!(1))
+    } else {
+        Some(inx_continuation!(-1))
+    };
+    (
+        16,
+        ExecEffect::In {
+            port: emulator.get_bc(),
+        },
+    )
+}
+
+/// INIR and INDR
+fn inxr(emulator: &mut Emulator, increment: bool) -> (u8, ExecEffect) {
+    let (_, in_effect) = inx(emulator, increment);
+    if emulator.b.0 == 1 {
+        (16, in_effect)
+    } else {
+        emulator.pc -= 2;
+        (21, in_effect)
+    }
 }
 
 fn outx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
