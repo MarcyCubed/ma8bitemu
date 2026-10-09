@@ -222,7 +222,7 @@ pub trait I8080FamilyEmulator: EmulatorCore {
     fn set_memptr(&mut self, address: u16);
 
     /// Give the emulator an input requested by the IN instruction
-    fn input(&mut self, value: u8);
+    fn input(&mut self, memory: &mut impl Memory, value: u8);
 
     /// Request an interrupt to be serviced
     ///
@@ -236,5 +236,30 @@ impl<T: I8080FamilyEmulator> Fetch for T {
         let address = self.get_pc().0;
         *self.get_pc_mut() += 1;
         memory.load(address)
+    }
+}
+
+/// Tests for emulators of processors in the Intel 8080 family
+#[cfg(test)]
+pub(crate) mod tests {
+    use crate::i8080::I8080FamilyEmulator;
+    use crate::{ExecEffect, memory};
+
+    /// Test the `IN` instruction of a processor in the 8080 family
+    pub(crate) fn test_input<E: I8080FamilyEmulator>(new: fn() -> E, clock_cycles: u8) {
+        // in 0 in 0 in 0 ...
+        let mut memory = memory::Repeat([0xdb, 0x0]);
+        let mut emulator = new();
+        for port in 0..=0xff {
+            for input in 0..=0xff {
+                // Set the port
+                memory.0[1] = port;
+                let (cycles, effect) = emulator.step(&mut memory);
+                assert_eq!(clock_cycles, cycles);
+                assert_eq!(effect, ExecEffect::In { port: port as u16 });
+                emulator.input(&mut memory, input);
+                assert_eq!(input, emulator.get_a().0);
+            }
+        }
     }
 }

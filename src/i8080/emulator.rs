@@ -690,7 +690,7 @@ impl I8080FamilyEmulator for Emulator {
         // Nothing to do
     }
 
-    fn input(&mut self, value: u8) {
+    fn input(&mut self, _memory: &mut impl Memory, value: u8) {
         self.a.0 = value
     }
 
@@ -721,7 +721,7 @@ impl Emulator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EmulatorCore;
+    use crate::{EmulatorCore, i8080};
     use core::assert_matches;
 
     /// Make a program to test interrupts
@@ -895,5 +895,11 @@ mod tests {
         const LIMIT: u64 = 10000;
         let (clock_cycles, _) = emulator.run_limited_clock(&mut program, LIMIT);
         assert!(clock_cycles >= LIMIT, "Stopped before reaching the limit.");
+    }
+
+    /// Check if the IN instruction is working properly
+    #[test]
+    fn input() {
+        i8080::tests::test_input(Emulator::new, 10);
     }
 }

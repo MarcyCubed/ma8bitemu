@@ -221,6 +221,14 @@ impl Emulator {
     pub fn non_masking_interrupt(&mut self) {
         self.nmi_pending = true;
     }
+
+    /// Handle pending input
+    pub fn handle_pending_input(&mut self, memory: &mut impl Memory) {
+        if let Some(cont) = self.input_continuation {
+            cont(self, memory, self.input_value);
+            self.input_continuation = None;
+        }
+    }
 }
 
 /// Implement the instruction `sub r`
@@ -262,12 +270,10 @@ macro_rules! cp_r {
 
 impl EmulatorCore for Emulator {
     fn next_instruction(&mut self, memory: &mut impl Memory) -> u8 {
-        // Check if there's pending input to handle
+        // Check if we're in the middle of an input instruction that never received input.
         // It's done here because it can change the PC
-        if let Some(cont) = self.input_continuation {
-            cont(self, memory, self.input_value);
-            self.input_continuation = None;
-        }
+        self.handle_pending_input(memory);
+
         if self.nmi_pending {
             // NMI
             self.nmi_pending = false;
@@ -1010,8 +1016,9 @@ impl I8080FamilyEmulator for Emulator {
         self.mem_ptr.0 = address
     }
 
-    fn input(&mut self, value: u8) {
+    fn input(&mut self, memory: &mut impl Memory, value: u8) {
         self.input_value = value;
+        self.handle_pending_input(memory);
     }
 
     fn interrupt(&mut self, vector: u8) -> u8 {
@@ -1021,5 +1028,243 @@ impl I8080FamilyEmulator for Emulator {
             InterruptMode::Rst38h => 13,
             InterruptMode::Vectored => 19,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory;
+
+    /// Test the 8080 `IN` instruction
+    #[test]
+    fn input_8080() {
+        i8080::tests::test_input(Emulator::new, 11);
+    }
+
+    /// Test the new `IN` instructions
+    #[test]
+    #[cfg_attr(debug_assertions, ignore = "Slow test: run it with --release")]
+    fn test_in() {
+        // List of IN opcodes and the function to get the value of the register they affect
+        let opcode_register: [(u8, Option<fn(&Emulator) -> Wrapping<u8>>); _] = [
+            (0x40, Some(Emulator::get_b)),
+            (0x48, Some(Emulator::get_c)),
+            (0x50, Some(Emulator::get_d)),
+            (0x58, Some(Emulator::get_e)),
+            (0x60, Some(Emulator::get_h)),
+            (0x68, Some(Emulator::get_l)),
+            (0x70, None),
+            (0x78, Some(Emulator::get_a)),
+        ];
+
+        let mut emulator = Emulator::new();
+
+        for (opcode, getter) in opcode_register {
+            let mut memory = memory::Repeat([0xed, opcode]);
+            for port in 0..=0xffff {
+                for input in 0..=0xff {
+                    for carry in [true, false] {
+                        // Set the port
+                        emulator.set_bc(port);
+                        // Set the flags
+                        emulator.cf = carry;
+                        emulator.nf = true;
+                        emulator.hf = true;
+                        let (cycles, effect) = emulator.step(&mut memory);
+                        assert_eq!(12, cycles);
+                        assert_eq!(effect, ExecEffect::In { port });
+                        emulator.input(&mut memory, input);
+                        // If there's a getter, check if the value was written to the register
+                        if let Some(getter) = getter {
+                            assert_eq!(input, getter(&emulator).0);
+                        }
+                        // Check the flags
+                        assert_eq!(carry, emulator.cf, "IN changed flag C");
+                        assert!(!emulator.nf, "IN didn't reset flag N");
+                        assert!(!emulator.hf, "IN didn't reset flag H");
+                        assert_eq!(input == 0, emulator.zf, "IN has wrong flag Z");
+                        assert_eq!(input > 0x7f, emulator.sf, "IN has wrong flag S");
+                        assert_eq!(
+                            input.count_ones() & 1 == 0,
+                            emulator.pf,
+                            "IN has wrong flag P"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// Testing string
+    const Z80_GREETING: &'static str =
+        "Hello, Z80! This is a string that will be sent to you using I/O.";
+
+    #[test]
+    fn test_ini_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // INI
+        memory[0] = 0xed;
+        memory[1] = 0xa2;
+        // jmp 0
+        memory[2] = 0xc3;
+        memory[3] = 0x00;
+        memory[4] = 0x00;
+
+        const STRING_ADDRESS: usize = 0x100;
+        // We'll write the string to address 0x100
+        emulator.set_hl(STRING_ADDRESS as u16);
+        emulator.b.0 = Z80_GREETING.len() as u8; // How many bytes we'll write
+        emulator.c.0 = 0x5; // The I/O port
+        for i in 0..Z80_GREETING.len() {
+            let (cycles, effect) = emulator.step(&mut memory);
+            assert_eq!(16, cycles);
+            let expected_port = u16::from_le_bytes([0x5, (Z80_GREETING.len() - i) as u8]);
+            assert_eq!(
+                effect,
+                ExecEffect::In {
+                    port: expected_port
+                }
+            );
+            let input_char = Z80_GREETING.as_bytes()[i];
+            emulator.input(&mut memory, input_char);
+            assert_eq!(Z80_GREETING.len() - i - 1, emulator.b.0 as usize);
+            // + 1 because HL was already increased
+            assert_eq!(STRING_ADDRESS + i + 1, emulator.get_hl() as usize);
+            assert!(emulator.nf);
+            assert_eq!(i == Z80_GREETING.len() - 1, emulator.zf);
+            // Do the jump
+            emulator.step(&mut memory);
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        let ini_string =
+            str::from_utf8(&memory[STRING_ADDRESS..STRING_ADDRESS + Z80_GREETING.len()]);
+        let Ok(z80_string) = ini_string else {
+            panic!("Recovered string is invalid")
+        };
+        assert_eq!(Z80_GREETING, z80_string, "The recovered string is wrong");
+    }
+
+    #[test]
+    fn test_ind_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x101];
+        // IND
+        memory[0] = 0xed;
+        memory[1] = 0xaa;
+        // jmp 0
+        memory[2] = 0xc3;
+        memory[3] = 0x00;
+        memory[4] = 0x00;
+
+        const STRING_ADDRESS: usize = 0x100;
+        // The string wil END at address 0x100
+        emulator.set_hl(STRING_ADDRESS as u16);
+        emulator.b.0 = Z80_GREETING.len() as u8; // How many bytes we'll write
+        emulator.c.0 = 0x5; // The I/O port
+        for i in 1..=Z80_GREETING.len() {
+            let b = emulator.b.0;
+            let (cycles, effect) = emulator.step(&mut memory);
+            assert_eq!(16, cycles);
+            let expected_port = u16::from_le_bytes([0x5, b]);
+            assert_eq!(
+                effect,
+                ExecEffect::In {
+                    port: expected_port
+                }
+            );
+            let input_char = Z80_GREETING.as_bytes()[Z80_GREETING.len() - i];
+            emulator.input(&mut memory, input_char);
+            assert_eq!(Z80_GREETING.len() - i, emulator.b.0 as usize);
+            assert_eq!(STRING_ADDRESS - i, emulator.get_hl() as usize);
+            assert!(emulator.nf);
+            assert_eq!(i == Z80_GREETING.len(), emulator.zf);
+            // Do the jump
+            emulator.step(&mut memory);
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        let ini_string = str::from_utf8(
+            &memory
+                [emulator.get_hl() as usize + 1..=emulator.get_hl() as usize + Z80_GREETING.len()],
+        );
+        let Ok(z80_string) = ini_string else {
+            panic!("Recovered string is invalid")
+        };
+        assert_eq!(Z80_GREETING, z80_string, "The recovered string is wrong");
+    }
+
+    #[test]
+    fn test_inir_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // INIR
+        memory[0] = 0xed;
+        memory[1] = 0xb2;
+        // HALT
+        memory[2] = 0x76;
+
+        const STRING_ADDRESS: usize = 0x100;
+        // We'll write the string to address 0x100
+        emulator.set_hl(STRING_ADDRESS as u16);
+        emulator.b.0 = Z80_GREETING.len() as u8; // How many bytes we'll write
+        emulator.c.0 = 0x5; // The I/O port
+        loop {
+            let (_, effect) = emulator.run(&mut memory);
+            match effect {
+                ExecEffect::In { port } => {
+                    emulator.input(
+                        &mut memory,
+                        Z80_GREETING.as_bytes()[Z80_GREETING.len() - (port >> 8) as usize],
+                    );
+                }
+                ExecEffect::Halt => break,
+                _ => panic!("Unexpected effect :{effect:?}"),
+            }
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        let ini_string =
+            str::from_utf8(&memory[STRING_ADDRESS..STRING_ADDRESS + Z80_GREETING.len()]);
+        let Ok(z80_string) = ini_string else {
+            panic!("Recovered string is invalid")
+        };
+        assert_eq!(Z80_GREETING, z80_string, "The recovered string is wrong");
+    }
+
+    #[test]
+    fn test_indr_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // INDR
+        memory[0] = 0xed;
+        memory[1] = 0xba;
+        // HALT
+        memory[2] = 0x76;
+
+        const STRING_ADDRESS: usize = 0x100;
+        // We'll write the string to address 0x100
+        emulator.set_hl(STRING_ADDRESS as u16);
+        emulator.b.0 = Z80_GREETING.len() as u8; // How many bytes we'll write
+        emulator.c.0 = 0x5; // The I/O port
+        loop {
+            let (_, effect) = emulator.run(&mut memory);
+            match effect {
+                ExecEffect::In { port } => {
+                    emulator.input(
+                        &mut memory,
+                        Z80_GREETING.as_bytes()[(port >> 8) as usize - 1],
+                    );
+                }
+                ExecEffect::Halt => break,
+                _ => panic!("Unexpected effect :{effect:?}"),
+            }
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        let ini_string =
+            str::from_utf8(&memory[STRING_ADDRESS - Z80_GREETING.len() + 1..=STRING_ADDRESS]);
+        let Ok(z80_string) = ini_string else {
+            panic!("Recovered string is invalid")
+        };
+        assert_eq!(Z80_GREETING, z80_string, "The recovered string is wrong");
     }
 }

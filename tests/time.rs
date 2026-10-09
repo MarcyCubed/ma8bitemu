@@ -293,9 +293,9 @@ fn test_z80_inir_indr() {
             21, cycles,
             "Wrong number of clock cycles on instruction: {opcode:02x}h clock cycles:{cycles:?}"
         );
-        emulator.input(0xff);
+        emulator.input(&mut memory, 0xff);
         let cycles = emulator.step(&mut memory).0;
-        emulator.input(0xff);
+        emulator.input(&mut memory, 0xff);
         assert_eq!(
             16, cycles,
             "Wrong number of clock cycles on instruction: {opcode:02x}h clock cycles:{cycles:?}"
@@ -314,11 +314,11 @@ fn test_z80_djnz() {
         13, cycles,
         "Wrong number of clock cycles on DJNZ (10h). clock cycles:{cycles:?}"
     );
-    emulator.input(0xff);
+    emulator.input(&mut memory, 0xff);
     // Reset the PC
     emulator.pc.0 = 0;
     let cycles = emulator.step(&mut memory).0;
-    emulator.input(0xff);
+    emulator.input(&mut memory, 0xff);
     assert_eq!(
         8, cycles,
         "Wrong number of clock cycles on DJNZ (10h). clock cycles:{cycles:?}"
