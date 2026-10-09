@@ -890,11 +890,22 @@ mod tests {
 
     #[test]
     fn check_running_limit() {
-        let mut program = [0xcb, 0x00, 0x00]; // jmp 0x00 : Infinite loop
+        let mut program = [0xc3, 0x00, 0x00]; // jmp 0x00 : Infinite loop
         let mut emulator = Emulator::new();
         const LIMIT: u64 = 10000;
         let (clock_cycles, _) = emulator.run_limited_clock(&mut program, LIMIT);
         assert!(clock_cycles >= LIMIT, "Stopped before reaching the limit.");
+    }
+
+    #[test]
+    fn check_run_n_instructions() {
+        let mut program = [0xc3, 0x00, 0x00]; // jmp 0x00 : Infinite loop
+        let mut emulator = Emulator::new();
+        for n in [0, 1, 1234, 1 << 18] {
+            let (clock_cycles, counter, _) = emulator.run_n_instructions(&mut program, n);
+            assert_eq!(n, counter);
+            assert_eq!(n * 10, clock_cycles);
+        }
     }
 
     /// Check if the IN instruction is working properly

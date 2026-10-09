@@ -73,6 +73,39 @@ pub trait EmulatorCore: Fetch {
         (clock_cycles, result)
     }
 
+    /// Run the program for the number of instructions requested or until it stops or performs I/O
+    ///
+    /// Return the number of clock cycles it took to execute the program, the number of instructions
+    /// executed and the result of the execution
+    fn run_n_instructions(
+        &mut self,
+        memory: &mut impl Memory,
+        number_of_instructions: u64,
+    ) -> (u64, u64, ExecEffect) {
+        let mut clock_cycles = 0;
+        let mut instruction_counter = 0;
+
+        if number_of_instructions == 0 {
+            return (0, 0, ExecEffect::Normal);
+        }
+
+        let result = loop {
+            let (cycles, result) = self.step(memory);
+            clock_cycles += cycles as u64;
+            instruction_counter += 1;
+            match result {
+                ExecEffect::Normal | ExecEffect::InterruptDelay => {}
+                result => break result,
+            }
+
+            if number_of_instructions == instruction_counter {
+                break result;
+            }
+        };
+
+        (clock_cycles, instruction_counter, result)
+    }
+
     /// Run a program until it halts or performs I/O
     ///
     /// Return the number of clock cycles it took to execute the program and the result of the execution.
