@@ -161,22 +161,22 @@ pub(super) fn run_opcode(
             i8080::jump::ret(emulator, memory);
             (14, ExecEffect::Normal)
         }
-        0xa0 => ldx(emulator, memory, 1),                     // ldi
-        0xa8 => ldx(emulator, memory, -1),                    // ldd
-        0xb0 => ldxr(emulator, memory, 1),                    // ldir
-        0xb8 => ldxr(emulator, memory, -1),                   // lddr
-        0xa1 => cpx(emulator, memory, 1),                     // cpi
-        0xa9 => cpx(emulator, memory, -1),                    // cpd
-        0xb1 => cpxr(emulator, memory, 1),                    // cpir
-        0xb9 => cpxr(emulator, memory, -1),                   // cpdr
-        0xa3 => outx(emulator, memory, 1),                    // outi
-        0xab => outx(emulator, memory, -1),                   // outd
-        0xb3 => repeat(outx, |s| s.zf, emulator, memory, 1),  // otir
-        0xbb => repeat(outx, |s| s.zf, emulator, memory, -1), // otdr
-        0xa2 => inx(emulator, true),                          // ini
-        0xaa => inx(emulator, false),                         // ind
-        0xb2 => inxr(emulator, true),                         // inir
-        0xba => inxr(emulator, false),                        // indr
+        0xa0 => ldx(emulator, memory, 1),   // ldi
+        0xa8 => ldx(emulator, memory, -1),  // ldd
+        0xb0 => ldxr(emulator, memory, 1),  // ldir
+        0xb8 => ldxr(emulator, memory, -1), // lddr
+        0xa1 => cpx(emulator, memory, 1),   // cpi
+        0xa9 => cpx(emulator, memory, -1),  // cpd
+        0xb1 => cpxr(emulator, memory, 1),  // cpir
+        0xb9 => cpxr(emulator, memory, -1), // cpdr
+        0xa3 => outx(emulator, memory, 1),  // outi
+        0xab => outx(emulator, memory, -1), // outd
+        0xb3 => otxr(emulator, memory, 1),  // otir
+        0xbb => otxr(emulator, memory, -1), // otdr
+        0xa2 => inx(emulator, true),        // ini
+        0xaa => inx(emulator, false),       // ind
+        0xb2 => inxr(emulator, true),       // inir
+        0xba => inxr(emulator, false),      // indr
         // NOP is the default
         _ => (4, ExecEffect::Normal),
     }
@@ -303,26 +303,6 @@ fn ldxr(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, 
     )
 }
 
-/// Implement one of the repeated instructions
-fn repeat<M: Memory>(
-    instruction: fn(&mut Emulator, &mut M, i16) -> (u8, ExecEffect),
-    exit_cond: impl Fn(&Emulator) -> bool,
-    emulator: &mut Emulator,
-    memory: &mut M,
-    offset: i16,
-) -> (u8, ExecEffect) {
-    instruction(emulator, memory, offset);
-    (
-        if exit_cond(emulator) {
-            16
-        } else {
-            emulator.pc -= 2;
-            21
-        },
-        ExecEffect::Normal,
-    )
-}
-
 /// Compare memory to accumulator, increase or decrease the pointer accordingly and decrease the
 /// counter
 fn cpx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
@@ -386,6 +366,7 @@ fn inxr(emulator: &mut Emulator, increment: bool) -> (u8, ExecEffect) {
     }
 }
 
+/// OUTI and OUTD
 fn outx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
     let data = emulator.load_hl(memory);
     emulator.set_hl(emulator.get_hl().wrapping_add_signed(offset));
@@ -399,5 +380,19 @@ fn outx(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, 
             port: emulator.get_bc(),
             data,
         },
+    )
+}
+
+/// OTIR and OTDR
+fn otxr(emulator: &mut Emulator, memory: &mut impl Memory, offset: i16) -> (u8, ExecEffect) {
+    let (_, effect) = outx(emulator, memory, offset);
+    (
+        if emulator.zf {
+            16
+        } else {
+            emulator.pc -= 2;
+            21
+        },
+        effect,
     )
 }

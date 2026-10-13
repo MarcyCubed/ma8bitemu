@@ -262,4 +262,30 @@ pub(crate) mod tests {
             }
         }
     }
+    /// Check if the OUT instruction is working properly
+    pub(crate) fn test_output<E: I8080FamilyEmulator>(new: fn() -> E, clock_cycles: u8) {
+        // out 0 out 0 out 0 ...
+        let mut memory = memory::Repeat([0xd3, 0x0]);
+        let mut emulator = new();
+        for port in 0..=0xff {
+            for output in 0..=0xff {
+                // Set the port
+                memory.0[1] = port;
+                emulator.get_a_mut().0 = output;
+                let (
+                    cycles,
+                    ExecEffect::Out {
+                        port: eff_port,
+                        data: eff_data,
+                    },
+                ) = emulator.step(&mut memory)
+                else {
+                    panic!("Out instruction didn't produce an Out effect")
+                };
+                assert_eq!(cycles, clock_cycles);
+                assert_eq!(port, eff_port as u8);
+                assert_eq!(output, eff_data);
+            }
+        }
+    }
 }

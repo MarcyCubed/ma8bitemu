@@ -1042,6 +1042,12 @@ mod tests {
         i8080::tests::test_input(Emulator::new, 11);
     }
 
+    /// Check if the OUT instruction is working properly
+    #[test]
+    fn output() {
+        i8080::tests::test_output(Emulator::new, 11);
+    }
+
     /// Test the new `IN` instructions
     #[test]
     #[cfg_attr(debug_assertions, ignore = "Slow test: run it with --release")]
@@ -1266,5 +1272,238 @@ mod tests {
             panic!("Recovered string is invalid")
         };
         assert_eq!(Z80_GREETING, z80_string, "The recovered string is wrong");
+    }
+
+    /// Test the new `OUT` instructions
+    #[test]
+    #[cfg_attr(debug_assertions, ignore = "Slow test: run it with --release")]
+    fn test_out() {
+        // List of IN opcodes and the function to get the value of the register they affect
+        let opcode_register: [(u8, Option<fn(&mut Emulator) -> &mut Wrapping<u8>>); _] = [
+            (0x41, Some(Emulator::get_b_mut)),
+            (0x49, Some(Emulator::get_c_mut)),
+            (0x51, Some(Emulator::get_d_mut)),
+            (0x59, Some(Emulator::get_e_mut)),
+            (0x61, Some(Emulator::get_h_mut)),
+            (0x69, Some(Emulator::get_l_mut)),
+            (0x71, None),
+            (0x79, Some(Emulator::get_a_mut)),
+        ];
+
+        let mut emulator = Emulator::new();
+
+        for (opcode, getter) in opcode_register {
+            let mut memory = memory::Repeat([0xed, opcode]);
+            for port in 0..=0xffff {
+                for data in 0..=0xff {
+                    // Set the output value
+                    if let Some(getter) = getter {
+                        getter(&mut emulator).0 = data
+                    }
+                    // Set the port
+                    emulator.set_bc(port);
+                    // Get the real data that will be sent to the device
+                    // If the register is B or C, the previous set_bc() changed it
+                    // If there is no register, the data is 0
+                    let data = if let Some(getter) = getter {
+                        getter(&mut emulator).0
+                    } else {
+                        0
+                    };
+                    let (cycles, effect) = emulator.step(&mut memory);
+                    assert_eq!(12, cycles);
+                    assert_eq!(effect, ExecEffect::Out { port, data });
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_outi_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // OUTI
+        memory[0] = 0xed;
+        memory[1] = 0xa3;
+        // jmp 0
+        memory[2] = 0xc3;
+        memory[3] = 0x00;
+        memory[4] = 0x00;
+        // String
+        const STRING_ADDRESS: usize = 0x100;
+        const STRING_LEN: usize = Z80_GREETING.as_bytes().len();
+        memory[STRING_ADDRESS..STRING_ADDRESS + STRING_LEN]
+            .copy_from_slice(Z80_GREETING.as_bytes());
+        // Point to the string
+        emulator.set_hl(STRING_ADDRESS as u16);
+        emulator.b.0 = STRING_LEN as u8;
+        emulator.c.0 = 0x5; // The I/O port
+        // Output
+        let mut output_string = [0; STRING_LEN];
+        for i in 0..STRING_LEN {
+            emulator.nf = false;
+            let (cycles, effect) = emulator.step(&mut memory);
+            assert_eq!(16, cycles);
+            let expected_port = u16::from_le_bytes([0x5, (STRING_LEN - i - 1) as u8]);
+            assert_eq!(
+                effect,
+                ExecEffect::Out {
+                    port: expected_port,
+                    data: Z80_GREETING.as_bytes()[i],
+                }
+            );
+            if let ExecEffect::Out { data, .. } = effect {
+                output_string[i] = data;
+            }
+            assert_eq!(STRING_LEN - i - 1, emulator.b.0 as usize);
+            // + 1 because HL was already increased
+            assert_eq!(STRING_ADDRESS + i + 1, emulator.get_hl() as usize);
+            assert!(emulator.nf);
+            assert_eq!(i == STRING_LEN - 1, emulator.zf);
+            // Do the jump
+            emulator.step(&mut memory);
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        assert_eq!(
+            Z80_GREETING.as_bytes(),
+            output_string,
+            "OUTI transferred the string improperly"
+        );
+    }
+
+    #[test]
+    fn test_outd_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // OUTI
+        memory[0] = 0xed;
+        memory[1] = 0xab;
+        // jmp 0
+        memory[2] = 0xc3;
+        memory[3] = 0x00;
+        memory[4] = 0x00;
+        // String
+        const STRING_ADDRESS: usize = 0x100;
+        const STRING_LEN: usize = Z80_GREETING.as_bytes().len();
+        memory[STRING_ADDRESS..STRING_ADDRESS + STRING_LEN]
+            .copy_from_slice(Z80_GREETING.as_bytes());
+        // Point to the string
+        emulator.set_hl((STRING_ADDRESS + STRING_LEN - 1) as u16);
+        emulator.b.0 = STRING_LEN as u8;
+        emulator.c.0 = 0x5; // The I/O port
+        // Output
+        let mut output_string = [0; STRING_LEN];
+        for i in (0..STRING_LEN).rev() {
+            emulator.nf = false;
+            let (cycles, effect) = emulator.step(&mut memory);
+            assert_eq!(16, cycles);
+            let expected_port = u16::from_le_bytes([0x5, i as u8]);
+            assert_eq!(
+                effect,
+                ExecEffect::Out {
+                    port: expected_port,
+                    data: Z80_GREETING.as_bytes()[i],
+                }
+            );
+            if let ExecEffect::Out { data, .. } = effect {
+                output_string[i] = data;
+            }
+            assert_eq!(i, emulator.b.0 as usize);
+            // - 1 because HL was already decreased
+            assert_eq!(STRING_ADDRESS + i - 1, emulator.get_hl() as usize);
+            assert!(emulator.nf);
+            assert_eq!(i == 0, emulator.zf);
+            // Do the jump
+            emulator.step(&mut memory);
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        assert_eq!(
+            Z80_GREETING.as_bytes(),
+            output_string,
+            "OUTI transferred the string improperly"
+        );
+    }
+
+    #[test]
+    fn test_otir_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // OTIR
+        memory[0] = 0xed;
+        memory[1] = 0xb3;
+        // HALT
+        memory[2] = 0x76;
+        // String
+        const STRING_ADDRESS: usize = 0x100;
+        const STRING_LEN: usize = Z80_GREETING.as_bytes().len();
+        memory[STRING_ADDRESS..STRING_ADDRESS + STRING_LEN]
+            .copy_from_slice(Z80_GREETING.as_bytes());
+        emulator.b.0 = STRING_LEN as u8; // How many bytes we'll output
+        emulator.c.0 = 0x5; // The I/O port
+        emulator.set_hl(STRING_ADDRESS as u16); // Point to the string
+        // Output
+        let mut output_string = [0; STRING_LEN];
+        let mut i = 0;
+        loop {
+            let (_, effect) = emulator.run(&mut memory);
+            match effect {
+                ExecEffect::Out { port, data } => {
+                    output_string[i] = data;
+                    assert_eq!(5, port as u8);
+                }
+                ExecEffect::Halt => break,
+                _ => panic!("Unexpected effect :{effect:?}"),
+            }
+            i += 1;
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        assert_eq!(
+            Z80_GREETING.as_bytes(),
+            output_string,
+            "OUTI transferred the string improperly"
+        );
+    }
+
+    #[test]
+    fn test_otdr_write_string() {
+        let mut emulator = Emulator::new();
+        let mut memory = [0; 0x200];
+        // OTDR
+        memory[0] = 0xed;
+        memory[1] = 0xbb;
+        // HALT
+        memory[2] = 0x76;
+        // String
+        const STRING_ADDRESS: usize = 0x100;
+        const STRING_LEN: usize = Z80_GREETING.as_bytes().len();
+        memory[STRING_ADDRESS..STRING_ADDRESS + STRING_LEN]
+            .copy_from_slice(Z80_GREETING.as_bytes());
+        emulator.b.0 = STRING_LEN as u8; // How many bytes we'll output
+        emulator.c.0 = 0x5; // The I/O port
+        emulator.set_hl((STRING_ADDRESS + STRING_LEN - 1) as u16); // Point to the end of the string
+        // Output
+        let mut output_string = [0; STRING_LEN];
+        let mut i = STRING_LEN;
+        loop {
+            let (_, effect) = emulator.run(&mut memory);
+            match effect {
+                ExecEffect::Out { port, data } => {
+                    i -= 1;
+                    output_string[i] = data;
+                    assert_eq!(5, port as u8);
+                }
+                ExecEffect::Halt => {
+                    assert_eq!(0, i);
+                    break;
+                }
+                _ => panic!("Unexpected effect :{effect:?}"),
+            }
+        }
+        assert!(emulator.zf, "Didn't transfer the while string");
+        assert_eq!(
+            Z80_GREETING.as_bytes(),
+            output_string,
+            "OUTI transferred the string improperly"
+        );
     }
 }

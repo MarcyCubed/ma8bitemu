@@ -913,4 +913,10 @@ mod tests {
     fn input() {
         i8080::tests::test_input(Emulator::new, 10);
     }
+
+    /// Check if the OUT instruction is working properly
+    #[test]
+    fn output() {
+        i8080::tests::test_output(Emulator::new, 10);
+    }
 }
