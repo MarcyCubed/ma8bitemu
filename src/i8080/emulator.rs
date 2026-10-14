@@ -85,6 +85,10 @@ impl crate::EmulatorCore for Emulator {
         }
     }
 
+    fn reset(&mut self) {
+        *self = Self::new();
+    }
+
     /// Execute a single opcode.
     ///
     /// Return the number of clock cycles it took to execute the instruction and the result of the execution

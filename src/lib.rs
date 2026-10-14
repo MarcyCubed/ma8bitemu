@@ -34,6 +34,9 @@ pub trait EmulatorCore: Fetch {
         self.fetch_byte(memory)
     }
 
+    /// Send the reset signal to the processor.
+    fn reset(&mut self);
+
     /// Execute a single opcode.
     ///
     /// Return the number of clock cycles it took to execute the instruction and the result of the

@@ -301,6 +301,10 @@ impl EmulatorCore for Emulator {
         }
     }
 
+    fn reset(&mut self) {
+        *self = Self::new()
+    }
+
     fn run_opcode(&mut self, opcode: u8, memory: &mut impl Memory) -> (u8, ExecEffect) {
         // Increase the R register
         self.inc_r();
