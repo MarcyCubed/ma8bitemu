@@ -1048,7 +1048,7 @@ mod tests {
 
     /// Check if the OUT instruction is working properly
     #[test]
-    fn output() {
+    fn output_8080() {
         i8080::tests::test_output(Emulator::new, 11);
     }
 
@@ -1509,5 +1509,20 @@ mod tests {
             output_string,
             "OUTI transferred the string improperly"
         );
+    }
+
+    #[test]
+    fn test_interrupts_im_0() {
+        i8080::tests::test_interrupts(i8080::Emulator::new())
+    }
+
+    #[test]
+    fn test_run_limited_clock() {
+        i8080::tests::test_run_limited_clock(i8080::Emulator::new());
+    }
+
+    #[test]
+    fn test_run_n_instructions() {
+        i8080::tests::test_run_n_instructions(i8080::Emulator::new())
     }
 }
