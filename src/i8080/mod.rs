@@ -379,27 +379,36 @@ pub(crate) mod tests {
     }
 
     macro_rules! assert_port {
-        ($number:literal, $result:expr, $text: literal) => {
-            core::assert_matches!($result, ExecEffect::Out { .. });
-            if let ExecEffect::Out { port, .. } = $result {
-                assert_eq!($number, port & 0xff, $text);
-            }
+        ($number:expr, $result:expr, $text: literal) => {
+            let r = $result;
+            let ExecEffect::Out { port, .. } = r else {
+                panic!($text)
+            };
+            assert_eq!($number, port & 0xff, $text);
+        };
+        ($number:expr, $result:expr) => {
+            let r = $result;
+            let ExecEffect::Out { port, .. } = r else {
+                panic!("{:?} in not an 'Out'", r)
+            };
+            assert_eq!($number, port & 0xff);
         };
     }
+    pub(crate) use assert_port;
 
     /// Run until we execute an Out or reach the limit
-    fn run_until_out(
+    pub(crate) fn run_until_out(
         emulator: &mut impl I8080FamilyEmulator,
         program: &mut impl Memory,
         limit: u32,
     ) -> ExecEffect {
         let mut limit = limit;
         loop {
-            let effect = emulator.run(program).1;
+            let (_, effect) = emulator.step(program);
             if let ExecEffect::Out { .. } = effect {
                 break effect;
             } else if limit == 0 {
-                break ExecEffect::Normal;
+                break effect;
             } else {
                 limit -= 1;
             }

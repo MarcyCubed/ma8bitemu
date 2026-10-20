@@ -701,7 +701,7 @@ impl I8080FamilyEmulator for Emulator {
     fn interrupt(&mut self, vector: u8) -> u8 {
         self.interrupt_vector = Some(vector);
         self.inte = false;
-        11 // I couldn't find the actual time in the 8080 documentation, so I used Z80's
+        2 // I couldn't find the actual time in the 8080 documentation, so I used Z80's
     }
 }
 

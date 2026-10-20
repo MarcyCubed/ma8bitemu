@@ -285,7 +285,11 @@ impl EmulatorCore for Emulator {
             && self.iff1
             && self.last_effect != ExecEffect::InterruptDelay
         {
-            // Normal Interrupt
+            // Handle the interrupt
+            self.interrupt_vector = None;
+            self.iff1 = false;
+            self.iff2 = false;
+            self.inc_r();
             match self.interrupt_mode {
                 InterruptMode::I8080 => vector,
                 InterruptMode::Rst38h => 0xff,
@@ -1028,8 +1032,8 @@ impl I8080FamilyEmulator for Emulator {
     fn interrupt(&mut self, vector: u8) -> u8 {
         self.interrupt_vector = Some(vector);
         match self.interrupt_mode {
-            InterruptMode::I8080 => 11,
-            InterruptMode::Rst38h => 13,
+            InterruptMode::I8080 => 2,
+            InterruptMode::Rst38h => 2,
             InterruptMode::Vectored => 19,
         }
     }
@@ -1038,6 +1042,7 @@ impl I8080FamilyEmulator for Emulator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::i8080::tests::{assert_port, run_until_out};
     use crate::memory;
 
     /// Test the 8080 `IN` instruction
@@ -1514,6 +1519,85 @@ mod tests {
     #[test]
     fn test_interrupts_im_0() {
         i8080::tests::test_interrupts(i8080::Emulator::new())
+    }
+
+    /// Test interrupt mode 1
+    #[test]
+    fn test_interrupts_im_1() {
+        let preamble: [u8; _] = [
+            0xed, 0x56, // im 1
+            0xd3, 0x00, // out (0), a
+            0xfb, // ei
+            0xd3, 0x01, // out (1), a
+            0xd3, 0x02, // out (2), a
+            0x76, // halt
+        ];
+        // Interrupt handler at 0x0038
+        let handler_38h: [u8; _] = [
+            0xd3, 0x10, // out (10h), a
+            0xd3, 0x11, // out (11h), a
+            0xfb, // ei
+            0xd3, 0x12, // out (12h), a
+            0xd3, 0x13, // out (13h), a
+            0xed, 0x4d, // reti
+        ];
+        // Interrupt handler at 0x0010
+        let handler_10h: [u8; _] = [
+            0xd3, 0x20, // out (20h), a
+            0xfb, // ei
+            0xed, 0x4d, // reti
+        ];
+
+        let mut memory = [0u8; 1 << 16];
+        memory[0..preamble.len()].copy_from_slice(&preamble);
+        memory[0x38..0x38 + handler_38h.len()].copy_from_slice(&handler_38h);
+        memory[0x10..0x10 + handler_10h.len()].copy_from_slice(&handler_10h);
+        let mut emulator = Emulator::new();
+        emulator.interrupt(0xd7); // 0xd7 == rst 10h
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x0, result, "Interrupt triggered early");
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x1, result, "EI didn't protect next instruction");
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x10, result, "Interrupt didn't trigger properly");
+        // Another interrupt in the middle of the handler
+        emulator.interrupt(0xd7);
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(
+            0x11,
+            result,
+            "Interrupts weren't disabled before calling the handler"
+        );
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x12, result, "EI didn't protect next instruction");
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x10, result, "Inner interrupt didn't trigger properly");
+        assert_port!(0x11, run_until_out(&mut emulator, &mut memory, 2));
+        assert_port!(0x12, run_until_out(&mut emulator, &mut memory, 2));
+        assert_port!(0x13, run_until_out(&mut emulator, &mut memory, 2));
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x13, result, "Didn't return from chained interrupt");
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x2, result, "Didn't return from first interrupt");
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_eq!(ExecEffect::Halt, result, "Didn't halt at end of program");
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_eq!(ExecEffect::Halt, result, "HALT didn't work somehow");
+        // Run interrupt on halted processor
+        emulator.interrupt(0xd7);
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_port!(0x10, result, "Didn't trigger interrupt on halted processor");
+        assert_port!(0x11, run_until_out(&mut emulator, &mut memory, 2));
+        assert_port!(0x12, run_until_out(&mut emulator, &mut memory, 2));
+        assert_port!(0x13, run_until_out(&mut emulator, &mut memory, 2));
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_eq!(
+            ExecEffect::Halt,
+            result,
+            "Return from interrupt didn't halt processor again"
+        );
+        let result = run_until_out(&mut emulator, &mut memory, 2);
+        assert_eq!(ExecEffect::Halt, result, "Not halted anymore?!");
     }
 
     #[test]
