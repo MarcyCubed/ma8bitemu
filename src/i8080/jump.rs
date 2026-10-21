@@ -63,7 +63,7 @@ pub(crate) fn push_stack(
     memory.store(state.get_sp().0, value[0]);
 }
 
-/// Pop a register to the stack
+/// Push instruction: push a register to the stack
 #[inline]
 pub(crate) fn push<S: I8080FamilyEmulator>(
     state: &mut S,
