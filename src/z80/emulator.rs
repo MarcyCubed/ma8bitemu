@@ -181,7 +181,7 @@ impl Emulator {
     fn jr(&mut self, cond: fn(&Emulator) -> bool, memory: &impl Memory) -> u8 {
         let d = self.fetch_byte(memory);
         self.mem_ptr = self.pc;
-        self.mem_ptr += d as u16;
+        self.mem_ptr += d as i8 as u16;
 
         if cond(&self) {
             self.pc = self.mem_ptr;
@@ -1598,6 +1598,68 @@ mod tests {
         );
         let result = run_until_out(&mut emulator, &mut memory, 2);
         assert_eq!(ExecEffect::Halt, result, "Not halted anymore?!");
+    }
+
+    /// Test interrupt mode 1
+    #[test]
+    fn test_interrupts_im_2() {
+        let mut emulator = Emulator::new();
+        // Initialize the memory with halts
+        let mut memory = [0x76; 1 << 16];
+        // The main program. It exists so the processor is running while interrupts occur.
+        let program = [
+            0xed, 0x5e, // im 2
+            // Interrupt handler addresses in page 1
+            0x3e, 0x01, // ld a, 1
+            0xed, 0x47, // ld i, a
+            0xfb, // ei
+            // loop:
+            0x14, // inc d
+            0x00, // nop
+            0x18, 0xfc, // jr loop
+        ];
+        memory[0..program.len()].copy_from_slice(&program);
+        // We map interrupt numbers to I/O ports using a rotation.
+        // It's deterministic and we ensure the value isn't being copied
+        const ROTATION: u32 = 3;
+        // Only even interrupt data because that's what the documentation specifies.
+        // The documentation implies odd ones will have the lsb reset...
+        // ... but the actual chips don't seem to do that, so we just don't test them.
+        for irq in (0u8..=0xfe).filter(|irq| irq % 2 == 0) {
+            // 200 to spread the handlers all over memory
+            // 0x222 to start somewhere after the interrupt vector table
+            // These values are basically arbitrary
+            let handler_address = irq as usize * 200 + 0x222;
+            // Address of the pointer to the handler
+            let handler_pointer = 0x100 + irq as usize;
+            let handler = [
+                0xd3,
+                irq.rotate_left(ROTATION), // out (irq rotl 3), a
+                0xfb,                      // ei
+                0xc9,                      // ret
+            ];
+            // Put the handler in memory
+            memory[handler_address..handler_address + handler.len()].copy_from_slice(&handler);
+            // Add the handler to the vector
+            memory[handler_pointer..handler_pointer + 2]
+                .copy_from_slice(&(handler_address as u16).to_le_bytes());
+        }
+        // Run for a little while to ensure the program is initialized and running
+        assert_eq!(
+            ExecEffect::Normal,
+            emulator.run_n_instructions(&mut memory, 20).2
+        );
+        // Run the tests
+        for irq in (0u8..=0xfe).filter(|irq| irq % 2 == 0) {
+            emulator.interrupt(irq);
+            let effect = emulator.run_n_instructions(&mut memory, 100).2;
+            assert_port!(irq.rotate_left(ROTATION) as u16, effect);
+            // Finish the handler
+            assert_eq!(
+                ExecEffect::Normal,
+                emulator.run_n_instructions(&mut memory, 20).2
+            );
+        }
     }
 
     #[test]
