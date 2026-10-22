@@ -205,7 +205,7 @@ pub trait I8080FamilyEmulator: EmulatorCore {
         memory.load(self.get_hl())
     }
 
-    /// Load the data pointed by HL
+    /// Store a byte in the address pointed by HL
     fn store_hl(&self, memory: &mut impl Memory, data: u8) {
         memory.store(self.get_hl(), data)
     }
