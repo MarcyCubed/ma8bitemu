@@ -1600,7 +1600,7 @@ mod tests {
         assert_eq!(ExecEffect::Halt, result, "Not halted anymore?!");
     }
 
-    /// Test interrupt mode 1
+    /// Test interrupt mode 2
     #[test]
     fn test_interrupts_im_2() {
         let mut emulator = Emulator::new();
